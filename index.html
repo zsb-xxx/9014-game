@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>9014 · 战棋 · v0.9 Public Playtest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="boot" style="min-height:100vh;background:#06060a;color:#d4af37;display:flex;align-items:center;justify-content:center;font-family:sans-serif;letter-spacing:.16em">9014 · 战棋载入中…</div>
+<script>
+(async()=>{
+  const load=async files=>(await Promise.all(files.map(f=>fetch(f).then(r=>{if(!r.ok)throw new Error(f+' '+r.status);return r.text()})))).join('');
+  try{
+    const [css,body,js]=await Promise.all([load(["css-01.txt", "css-02.txt", "css-03.txt", "css-04.txt", "css-05.txt", "css-06.txt"]),load(["body-01.txt", "body-02.txt"]),load(["js-01.txt", "js-02.txt", "js-03.txt", "js-04.txt", "js-05.txt", "js-06.txt", "js-07.txt", "js-08.txt", "js-09.txt", "js-10.txt"])]);
+    const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+    document.body.innerHTML=body;
+    const sc=document.createElement('script');sc.textContent=js;document.body.appendChild(sc);
+  }catch(e){document.getElementById('boot').textContent='载入失败：'+e.message;console.error(e)}
+})();
+</script>
+</body>
+</html>
