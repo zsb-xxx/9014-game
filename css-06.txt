@@ -1,0 +1,110 @@
+px 9px}
+.right-tab-shell .log{height:min(54vh,500px);min-height:260px}
+
+/* 标签按钮优先保证完整显示 */
+.hud-tabs{gap:4px;padding:4px}
+.hud-tab{min-width:0;padding:8px 3px;font-size:10.7px;letter-spacing:.035em;overflow:hidden;text-overflow:ellipsis}
+.hud-tab span{font-size:10.5px;margin-right:2px}
+.tab-tip{font-size:10.5px;line-height:1.55}
+
+/* Tooltip 不追求大，而追求对比和结构 */
+.tile-tooltip{min-width:210px;max-width:290px;padding:10px 11px;font-size:10.8px;line-height:1.62}
+.tile-tooltip .tt-name{font-size:12.5px}.tile-tooltip .tt-pos{font-size:9.5px}
+.tile-tooltip .tt-k{min-width:54px}
+
+/* 桌面宽屏恢复更合理的侧栏比例 */
+.game{grid-template-columns:278px minmax(672px,1fr) 304px;gap:12px;padding:12px;max-width:1620px}
+
+/* 1280 左右是旧版最容易溢出的区间：缩棋盘单格而不是暴力缩字体 */
+@media (max-width:1300px) and (min-width:1161px){
+  :root{--tile:52px}
+  .game{grid-template-columns:246px minmax(624px,1fr) 258px;gap:8px;padding:8px}
+  .panel{padding:10px}
+  .panel-h{font-size:10.2px}
+  .hud-tab{font-size:10px;padding:7px 2px}
+  .card .c-name{font-size:10.7px}.card .c-desc{font-size:9.3px}
+  .clinic-partner .cp-desc,.mxy-event .me-desc{font-size:9.3px}
+  .unit-info{min-height:205px}
+}
+
+/* 更早进入纵向布局，消灭 1100~1160px 的夹层溢出 */
+@media (max-width:1160px){
+  :root{--tile:56px}
+  .game{grid-template-columns:1fr;gap:10px;padding:10px}
+  .side{position:static;max-height:none;overflow:visible;padding:0;flex-direction:row;flex-wrap:wrap;width:100%}
+  .side>.panel,.hud-tab-shell{min-width:0;width:100%}
+  .hud-tab-pane.active{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));align-items:start}
+  .board-wrap{overflow-x:auto;padding-bottom:4px}
+  .right-tab-shell .log{height:220px;min-height:180px}
+}
+
+@media (max-width:700px){
+  :root{--tile:48px}
+  .game{padding:7px}
+  .hud-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .hud-tab{font-size:10px;letter-spacing:0}
+  .hud-tab span{display:none}
+  .hud-tab-pane.active{grid-template-columns:1fr}
+  .cards-grid{grid-template-columns:1fr 1fr}
+  .tile-tooltip{min-width:190px;max-width:min(270px,88vw)}
+}
+
+@media (max-width:560px){
+  :root{--tile:44px}
+  .top h1{font-size:20px;letter-spacing:.22em;text-indent:.22em}
+  .top p{font-size:10px;letter-spacing:.12em}
+  .scenario-tag{font-size:10px}
+  .turn-name{font-size:16px}
+  .card .c-desc{font-size:9.6px}
+  .log{font-size:10.5px}
+}
+
+
+
+/* ==================== 第十八版：公开试玩开始界面 / 教程 / 存档 ==================== */
+.top-actions{position:absolute;right:58px;top:16px;display:flex;gap:7px;z-index:6}
+.top-mini-btn{height:30px;padding:0 11px;border:1px solid rgba(212,175,55,.24);border-radius:6px;background:rgba(8,8,13,.78);color:#bdb4a3;font-family:inherit;font-size:10.5px;letter-spacing:.08em;cursor:pointer;transition:.2s}
+.top-mini-btn:hover{border-color:rgba(212,175,55,.72);color:#f0e2b0;background:rgba(212,175,55,.08)}
+
+.start{gap:0}
+.start-shell{width:min(920px,96vw);display:flex;flex-direction:column;align-items:center}
+.start-brand{font-family:var(--font-serif);font-size:clamp(31px,6vw,54px);font-weight:700;letter-spacing:.18em;text-indent:.18em;color:#f2e4b7;text-shadow:0 0 45px rgba(212,175,55,.35);margin:0 0 5px}
+.start-kicker{font-size:11px;color:#8d8578;letter-spacing:.28em;text-indent:.28em;margin:0 0 22px}
+.start-menu{width:min(460px,92vw);display:flex;flex-direction:column;gap:10px}
+.start-main-btn{width:100%;padding:13px 18px;border-radius:8px;border:1px solid rgba(212,175,55,.34);background:linear-gradient(90deg,rgba(212,175,55,.14),rgba(255,255,255,.02));color:#eadcab;font-family:var(--font-serif);font-size:15px;font-weight:600;letter-spacing:.16em;cursor:pointer;transition:.22s}
+.start-main-btn:hover:not(:disabled){transform:translateY(-2px);border-color:#d4af37;box-shadow:0 12px 28px -18px #d4af37}
+.start-main-btn.secondary{font-family:inherit;font-size:12px;color:#c7bead;background:rgba(255,255,255,.025);border-color:rgba(255,255,255,.13)}
+.start-main-btn:disabled{opacity:.34;cursor:not-allowed;filter:grayscale(.6)}
+.continue-meta{font-size:10px;color:#7e776c;line-height:1.6;margin-top:-4px;text-align:center;min-height:16px}
+.start-disclaimer{max-width:720px;margin-top:22px;padding:11px 15px;border-top:1px solid rgba(255,255,255,.08);color:#6f6a61;font-size:9.8px;line-height:1.75;text-align:center;letter-spacing:.02em}
+.start-disclaimer b{color:#a8a091;font-weight:500}
+.start-panel{display:none;width:100%;text-align:center}
+.start-panel.active{display:block}
+.start-back{margin-top:3px}
+.start-save-note{font-size:10px;color:#6f8f85;margin-top:8px;line-height:1.6}
+.faction-title{font-family:var(--font-serif);font-size:23px;color:#e7d9ad;letter-spacing:.18em;margin:4px 0 7px}
+.faction-sub{font-size:10.5px;color:#817a6e;letter-spacing:.12em;margin-bottom:17px}
+
+.tutorial{position:fixed;inset:0;z-index:115;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(3,3,7,.92);backdrop-filter:blur(12px);opacity:0;visibility:hidden;transition:.25s}
+.tutorial.open{opacity:1;visibility:visible}
+.tutorial-box{width:min(680px,94vw);border:1px solid rgba(212,175,55,.35);border-radius:14px;background:linear-gradient(180deg,rgba(21,20,28,.99),rgba(8,8,13,.99));box-shadow:0 30px 90px rgba(0,0,0,.6);padding:28px 30px 24px}
+.tutorial-step-num{font-family:var(--font-mono);font-size:10px;color:#8e856f;letter-spacing:.18em;margin-bottom:8px}
+.tutorial-title{font-family:var(--font-serif);font-size:24px;color:#f1e2af;letter-spacing:.13em;margin-bottom:12px}
+.tutorial-body{font-size:12.5px;line-height:1.9;color:#c6bdad}
+.tutorial-body b{color:#f0d879;font-weight:600}
+.tutorial-demo{margin:16px 0 6px;padding:12px 14px;border-left:2px solid #d4af37;background:rgba(212,175,55,.055);color:#aaa18f;font-size:11.5px;line-height:1.8}
+.tutorial-dots{display:flex;gap:6px;justify-content:center;margin:19px 0 15px}
+.tutorial-dot{width:7px;height:7px;border-radius:50%;background:#3d3932}.tutorial-dot.on{background:#d4af37;box-shadow:0 0 9px rgba(212,175,55,.7)}
+.tutorial-actions{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.tutorial-actions .btn{width:auto;min-width:110px;margin:0}
+.tutorial-skip{border:0;background:none;color:#777064;cursor:pointer;font-family:inherit;font-size:10.5px;text-decoration:underline;text-underline-offset:3px}
+.save-toast{position:fixed;left:50%;bottom:22px;z-index:130;transform:translate(-50%,14px);padding:8px 14px;border:1px solid rgba(126,224,138,.28);border-radius:7px;background:rgba(8,18,13,.94);color:#9be2a4;font-size:10.5px;letter-spacing:.08em;opacity:0;visibility:hidden;transition:.22s;pointer-events:none}
+.save-toast.on{opacity:1;visibility:visible;transform:translate(-50%,0)}
+
+@media(max-width:1160px){.top-actions{right:52px;top:12px}.top-mini-btn{padding:0 8px;font-size:9.5px}}
+@media(max-width:700px){
+  .top-actions{position:static;justify-content:center;margin-top:8px}.top-mini-btn{height:28px}
+  .tutorial-box{padding:22px 18px}.tutorial-title{font-size:20px}.tutorial-body{font-size:11.8px}
+  .start-brand{font-size:34px}.start-disclaimer{font-size:9px}
+}
+
