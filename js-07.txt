@@ -1,0 +1,499 @@
+  renderUnitInfo();
+  log(`选择技能范围确认施放 · 再次点击技能按钮取消`,'sys');
+}
+function cancelSkillMode(){
+  G.skillMode=false;G.skillCells=[];
+  if(G.selected)selectUnit(G.selected);
+  else{renderHighlights();renderUnitInfo();}
+}
+function castSkill(){
+  const u=G.selected;
+  if(!u||!canUseSkill(u))return;
+  const sk=SKILLS[u.type];
+  if(u.type==='mxy_lord'){
+    if(!activateMXYEnvoy(u,true))return;
+    G.skillMode=false;G.skillCells=[];slashAt(u.x,u.y,'skill');
+    renderUnits();renderHUD();renderUnitInfo();return;
+  }
+  u.energy-=sk.cost;
+  u.skillCd=sk.cd+1;
+  G.skillMode=false;G.skillCells=[];
+  slashAt(u.x,u.y,'skill');
+  if(u.type==='lord'){
+    let count=0;
+    G.units.forEach(t=>{
+      if(t.hp>0&&t.faction===u.faction&&dist(t,u)<=2){
+        t.flagBuff=true;
+        const heal=30;
+        t.hp=Math.min(t.maxHp,t.hp+heal);
+        float(t,heal,'heal');count++;
+      }
+    });
+    log(`<b>${factionName(u.faction)}</b> 统帅发动 <b>战旗号令</b>，${count} 名友军回复兵力`,'skill');
+  } else if(u.type==='brave'){
+    u.rageBuff=true;
+    log(`<b>${factionName(u.faction)}</b> 猛将发动 <b>狂暴突袭</b>，攻击 +50%`,'skill');
+  } else if(u.type==='sage'){
+    let totalDmg=0,count=0;
+    G.units.forEach(t=>{
+      if(t.hp>0&&t.faction!==u.faction&&dist(t,u)<=3){
+        const dmg=mitigateBossDamage(t,30);
+        t.hp-=dmg;float(t,dmg,'crit');shakeUnit(t);
+        totalDmg+=dmg;count++;
+        if(G.stats.damageDealt[u.faction]!==undefined)G.stats.damageDealt[u.faction]+=dmg;
+        if(t.isBoss&&G.stats.bossDamage[u.faction]!==undefined)G.stats.bossDamage[u.faction]+=dmg;
+        if(t.hp<=0){
+          log(`<b>${factionName(t.faction)} · ${t.typeName}</b> 被火计焚毁`,'kill');
+          gainExp(u,40);
+          if(G.stats.unitsLost[t.faction]!==undefined)G.stats.unitsLost[t.faction]++;
+          if(G.stats.kills[u.faction]!==undefined)G.stats.kills[u.faction]++;
+          recordRebelHead(t,u.faction);
+        }
+      }
+    });
+    log(`<b>${factionName(u.faction)}</b> 谋士发动 <b>火计焚营</b>，${count} 名敌军共受 ${totalDmg} 伤害`,'skill');
+  } else if(u.type==='guard'){
+    u.shieldWall=true;
+    const heal=20;
+    u.hp=Math.min(u.maxHp,u.hp+heal);
+    float(u,heal,'heal');
+    log(`<b>${factionName(u.faction)}</b> 精兵发动 <b>铁壁结阵</b>`,'skill');
+  }
+  u.acted=true;u.moved=true;
+  renderUnits();renderHUD();
+  setTimeout(checkWin,500);
+}
+
+function upgradeUnit(u){
+  if(G.gold[G.player]<50||u.faction!==G.player)return;
+  G.gold[G.player]-=50;
+  u.level++;u.maxHp+=12;u.hp+=12;u.atk+=3;
+  if(u.level===4)u.mov+=1;
+  lvFX(u.x,u.y);
+  log(`<b>${factionName(u.faction)}</b> 花费 50 金强化 ${u.typeName} 至 Lv${u.level}`,'skill');
+  renderHUD();renderUnits();
+}
+function healUnit(u){
+  if(G.gold[G.player]<30||u.faction!==G.player)return;
+  G.gold[G.player]-=30;
+  const heal=40;
+  u.hp=Math.min(u.maxHp,u.hp+heal);
+  healFX(u.x,u.y);float(u,heal,'heal');
+  log(`<b>${factionName(u.faction)}</b> 花费 30 金为 ${u.typeName} 治疗 ${heal}`,'skill');
+  renderHUD();renderUnits();
+}
+
+function useCard(i){
+  const hand=G.hand[G.player];
+  if(!hand||!hand[i])return;
+  const c=hand[i];
+  if(c.target==='unit'){
+    const u=G.selected;
+    if(!u||u.faction!==G.player){
+      log(`【功能卡】<b>${c.name}</b> 需要先选中己方单位`,'sys');
+      return;
+    }
+  }
+  const ok=c.use(G.selected);
+  if(ok){
+    hand.splice(i,1);
+    renderCards();
+    renderUnits();
+    renderHUD();
+    // 功能卡可能改变位置/行动状态；重新以当前位置计算移动与攻击格，避免传送后残留旧高亮。
+    if(G.selected&&G.selected.hp>0&&G.selected.faction===G.player)selectUnit(G.selected);
+    else renderHighlights();
+    setTimeout(checkWin,400);
+  }
+}
+function drawCard(fac){
+  const hand=G.hand[fac];
+  if(hand.length>=4)return;
+  if(Math.random()>0.5)return;
+  const c=CARDS[Math.floor(Math.random()*CARDS.length)];
+  hand.push(c);
+  if(fac===G.player){
+    log(`【功能卡】获得 <b>${c.name}</b> · ${c.desc}`,'card');
+  }
+}
+
+function selectUnit(u){
+  G.selected=u;
+  G.skillMode=false;G.skillCells=[];
+  G.moveCells=u.moved?[]:computeMoves(u);
+  G.atkCells=computeAtk(u);
+  renderUnits();renderHighlights();renderUnitInfo();renderCards();
+}
+function clearSelection(){
+  G.selected=null;G.skillMode=false;
+  G.moveCells=[];G.atkCells=[];G.skillCells=[];
+  renderUnits();renderHighlights();renderUnitInfo();renderCards();
+}
+
+function onTileClick(x,y){
+  if(G.over||G.busy)return;
+  if(G.zyNPC&&x===G.zyNPC.x&&y===G.zyNPC.y){log(`◇ ZY · 量子隐士：离线实验室保持独立。请在「势力 → ZY」面板查看态度并请求支援。`,'evt');renderZYInfo();return;}
+  if(G.current!==G.player)return;
+  if(G.skillMode&&G.selected){
+    const u=G.selected;
+    if(x===u.x&&y===u.y){cancelSkillMode();return;}
+    const inRange=G.skillCells.some(([mx,my])=>mx===x&&my===y);
+    if(inRange){castSkill();return;}
+    cancelSkillMode();return;
+  }
+  const clicked=unitAt(x,y);
+  if(clicked&&clicked.faction!==G.player&&G.selected){
+    if(G.selected.acted)return;
+    if(G.selected.isMXY&&G.selected.envoy){log('✉ 遣使护行期间，MXY 不可主动攻击。','sys');return;}
+    if(inPattern(G.selected,clicked.x,clicked.y)){
+      const flank=flankBonus(G.selected,clicked);
+      const mul=flank?1.5:1;
+      if(flank)log(`<b>夹击！</b> 伤害 +50%`,'evt');
+      doAttack(G.selected,clicked,mul);
+      clearSelection();return;
+    }
+  }
+  if(clicked&&clicked.faction===G.player){
+    if(clicked.acted){clearSelection();return;}
+    if(G.selected===clicked){clearSelection();return;}
+    selectUnit(clicked);return;
+  }
+  if(G.selected&&!G.selected.moved){
+    const can=G.moveCells.some(([mx,my])=>mx===x&&my===y);
+    if(can){
+      const u=G.selected;
+      u.x=x;u.y=y;u.moved=true;
+      renderUnits();
+      if(u.isMXY){recordMXYMeet(u);evaluateMXYEvent(u);if(G.over)return;const cur=currentMXYEvent();G.mxy.lastText=cur?`正在推进：${cur.name}`:'事件链已完成';}
+      const terrKey=x+','+y;
+      if(MAP[y][x]===4){
+        const prev=G.towns[terrKey];
+        if(prev!==u.faction){
+          G.towns[terrKey]=u.faction;refreshTiles();
+          log(`<b>${factionName(u.faction)}</b> 接管算力节点 (${x},${y})`,'evt');
+        }
+      }
+      G.moveCells=[];
+      G.atkCells=computeAtk(u);
+      renderHighlights();
+      const canHit=alive().some(e=>e.faction!==u.faction&&inPattern(u,e.x,e.y));
+      if(!canHit){u.acted=true;clearSelection();renderHUD();}
+      else renderUnitInfo();
+      return;
+    }
+  }
+  clearSelection();
+}
+
+tilesEl.addEventListener('mousemove',e=>{
+  const tile=e.target.closest('.tile');
+  if(!tile)return;
+  showTileTooltip(tile,e);
+});
+tilesEl.addEventListener('mouseleave',()=>tileTooltip.classList.remove('on'));
+tilesEl.addEventListener('mousedown',()=>tileTooltip.classList.remove('on'));
+
+boardEl.addEventListener('click',e=>{
+  const rect=boardEl.getBoundingClientRect();
+  const tile=rect.width/COLS;
+  const x=Math.floor((e.clientX-rect.left)/tile);
+  const y=Math.floor((e.clientY-rect.top)/tile);
+  if(!inBoard(x,y))return;
+  onTileClick(x,y);
+});
+
+/* ==================== 天灾调度 ==================== */
+function pickDisaster(exclude){
+  const pool=DISASTERS.filter(d=>d.key!==exclude);
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function announceDisaster(d){
+  disFlash.style.setProperty('--dc',d.color);
+  disFlash.classList.remove('on');
+  void disFlash.offsetWidth;
+  disFlash.classList.add('on');
+  disBanner.style.setProperty('--dc',d.color);
+  dbIco.textContent=d.icon;
+  dbName.textContent=d.name;
+  dbDesc.textContent=d.long;
+  disBanner.classList.add('on');
+  setTimeout(()=>disBanner.classList.remove('on'),2600);
+}
+function triggerDisaster(d){
+  G.disaster={key:d.key,roundsLeft:d.duration};
+  G.pendingDisaster=null;
+  G.lastDisasterKey=d.key;
+  announceDisaster(d);
+  log(`【天灾】<b>${d.icon} ${d.name}</b> —— ${d.long}`,'dis');
+  if(d.instant && d.apply){
+    setTimeout(()=>{d.apply();renderUnits();},900);
+  } else if(d.apply){
+    d.apply();
+  }
+  applyDisasterTiles();
+  renderDisasterPanel();
+  renderHUD();
+}
+function tickDisaster(){
+  if(!G.disaster)return;
+  const d=DISASTERS.find(x=>x.key===G.disaster.key);
+  if(d.perTurn){
+    setTimeout(()=>{
+      d.perTurn();
+      renderUnits();renderHUD();
+      setTimeout(checkWin,200);
+    },400);
+  }
+  G.disaster.roundsLeft--;
+  if(G.disaster.roundsLeft<=0){
+    setTimeout(()=>{
+      log(`【天灾】${d.icon} ${d.name} 消散`,'sys');
+      G.disaster=null;
+      applyDisasterTiles();
+      renderDisasterPanel();renderHUD();
+    },900);
+  } else {
+    renderDisasterPanel();
+  }
+}
+function maybeTriggerDisaster(){
+  if(G.disaster)return;
+  if(G.pendingDisaster){
+    const d=DISASTERS.find(x=>x.key===G.pendingDisaster);
+    triggerDisaster(d);
+    return;
+  }
+  if(G.round<2)return;
+  const rate = G.scenario ? G.scenario.disasterRate : 0.25;
+  let trigger=false;
+  if(G.round%5===0){trigger=true;}
+  else if(Math.random()<rate){trigger=true;}
+  if(trigger){
+    const d=pickDisaster(G.lastDisasterKey);
+    if(G.round%5===0){
+      triggerDisaster(d);
+    } else {
+      G.pendingDisaster=d.key;
+      log(`【天象预警】下一回合可能降临：${d.icon} ${d.name}`,'evt');
+      renderDisasterPanel();
+    }
+  }
+}
+
+/* ==================== 安全区（收圈） ==================== */
+function maybeStartShrink(){
+  if(!G.scenario || !G.scenario.hasShrink) return;
+  if(G.shrink.active) return;
+  if(G.round < G.scenario.shrinkStartRound) return;
+  G.shrink.active = true;
+  G.shrink.colMin = 0;
+  G.shrink.colMax = COLS-1;
+  G.shrink.rowMin = 0;
+  G.shrink.rowMax = ROWS-1;
+  G.shrink.nextRound = G.round + G.scenario.shrinkInterval;
+  G.shrink.totalShrunk = 0;
+  log(`⚠ <b>安全区已激活</b>：第 ${G.scenario.shrinkStartRound} 回合起，每 ${G.scenario.shrinkInterval} 回合收缩！`,'shrink');
+  applyShrinkTiles();
+  renderZonePanel();
+  renderHUD();
+}
+
+function shrinkZone(){
+  if(!G.shrink.active) return false;
+  const w = G.shrink.colMax - G.shrink.colMin + 1;
+  const h = G.shrink.rowMax - G.shrink.rowMin + 1;
+  // 最小安全区：6x4
+  const choices = [];
+  if(w > 6){
+    choices.push('left');
+    choices.push('right');
+  }
+  if(h > 4){
+    choices.push('top');
+    choices.push('bottom');
+  }
+  if(!choices.length) return false;
+
+  // 优先收缩单位较少的方向，让战场更聚焦
+  choices.sort(()=>Math.random()-0.5);
+  const dir = choices[0];
+  if(dir === 'left') G.shrink.colMin++;
+  else if(dir === 'right') G.shrink.colMax--;
+  else if(dir === 'top') G.shrink.rowMin++;
+  else if(dir === 'bottom') G.shrink.rowMax--;
+
+  G.shrink.totalShrunk++;
+  G.shrink.nextRound = G.round + G.scenario.shrinkInterval;
+
+  const w2 = G.shrink.colMax - G.shrink.colMin + 1;
+  const h2 = G.shrink.rowMax - G.shrink.rowMin + 1;
+  log(`⚠ <b>安全区收缩</b>：当前 ${w2}×${h2} 格（圈外每回合损失 50% 兵力）`,'shrink');
+
+  // 全屏红光提示
+  disFlash.style.setProperty('--dc','#ff5b3a');
+  disFlash.classList.remove('on');
+  void disFlash.offsetWidth;
+  disFlash.classList.add('on');
+  disBanner.style.setProperty('--dc','#ff5b3a');
+  dbIco.textContent='⚠';
+  dbName.textContent='安 全 区 收 缩';
+  dbDesc.textContent=`当前安全区 ${w2}×${h2} 格`;
+  disBanner.classList.add('on');
+  setTimeout(()=>disBanner.classList.remove('on'),2600);
+
+  boardEl.classList.add('shake-d');
+  setTimeout(()=>boardEl.classList.remove('shake-d'),650);
+
+  applyShrinkTiles();
+  renderZonePanel();
+  return true;
+}
+
+function applyShrinkDamage(){
+  if(!G.shrink.active) return;
+  let hit=0;
+  G.units.forEach(u=>{
+    if(u.hp<=0) return;
+    if(inSafeZone(u.x,u.y)) return;
+    const dmg = Math.max(1, Math.round(u.hp * 0.5));
+    u.hp -= dmg;
+    float(u, dmg, 'zone');
+    shakeUnit(u);
+    hit++;
+    log(`☠ ${factionName(u.faction)} · ${u.typeName} 处于安全区外，损失 <b>${dmg}</b> 兵力（半数）`,'shrink');
+    if(u.hp<=0){
+      log(`<b>${factionName(u.faction)} · ${u.typeName}</b> 被安全区吞噬`,'kill');
+      if(G.stats.unitsLost[u.faction]!==undefined)G.stats.unitsLost[u.faction]++;
+    }
+  });
+  if(hit>0){
+    renderUnits();renderHUD();
+    setTimeout(checkWin, 300);
+  }
+}
+
+function maybeShrink(){
+  if(!G.scenario || !G.scenario.hasShrink) return;
+  if(!G.shrink.active) return;
+  if(G.round < G.shrink.nextRound) return;
+  shrinkZone();
+}
+
+/* ==================== BOSS ==================== */
+function mitigateBossDamage(target,dmg){
+  if(!target||!target.isBoss)return Math.max(0,Math.round(dmg));
+  return Math.max(1,Math.round(dmg*BOSS_RULES.damageTaken));
+}
+function bossPhaseFromHp(boss){
+  if(!boss||boss.maxHp<=0)return 1;
+  const pct=boss.hp/boss.maxHp;
+  if(pct<=BOSS_RULES.phase3Pct)return 3;
+  if(pct<=BOSS_RULES.phase2Pct)return 2;
+  return 1;
+}
+function bossPhaseLabel(phase){
+  return phase>=3?'Ⅲ · 末 日':phase===2?'Ⅱ · 狂 暴':'Ⅰ · 镇 定';
+}
+function bossEffectiveAtk(boss){
+  if(!boss)return 0;
+  const phase=Math.max(boss.phase||1,bossPhaseFromHp(boss));
+  const mul=phase>=3?1.50:phase===2?1.25:1;
+  return Math.round(boss.atk*mul);
+}
+function announceBossPhase(boss,phase){
+  if(!boss||!G.bossKey)return;
+  const b=BOSSES[G.bossKey];
+  disFlash.style.setProperty('--dc',b.color);
+  disFlash.classList.remove('on');void disFlash.offsetWidth;disFlash.classList.add('on');
+  disBanner.style.setProperty('--dc',b.color);
+  dbIco.textContent=phase>=3?'☠':'⚠';
+  dbName.textContent=phase>=3?`${b.name} · 最终阶段`:`${b.name} · 狂暴阶段`;
+  dbDesc.textContent=phase>=3?'攻击 +50% · 每轮行动两次 · 回复降至 3%':'攻击 +25% · 专属技能强化';
+  disBanner.classList.add('on');
+  setTimeout(()=>disBanner.classList.remove('on'),3000);
+}
+function updateBossPhase(boss,announce=true){
+  if(!boss||!boss.isBoss)return 1;
+  const calc=bossPhaseFromHp(boss);
+  const prev=boss.phase||1;
+  boss.phase=Math.max(prev,calc); // 阶段只会升级，不会因回血倒退
+  if(announce&&boss.phase>prev){
+    const b=BOSSES[G.bossKey];
+    log(`【BOSS 阶段变化】<b style="color:${b.color}">${b.name}</b> 进入 <b>${bossPhaseLabel(boss.phase)}</b>`,'boss');
+    announceBossPhase(boss,boss.phase);
+  }
+  return boss.phase;
+}
+function bossActOnce(boss,onDone){
+  if(!boss||boss.hp<=0){onDone&&onDone();return;}
+  if(G.bossKey==='XZR') bossTurnXZR(boss,onDone);
+  else if(G.bossKey==='FXY') bossTurnFXY(boss,onDone);
+  else if(G.bossKey==='LBL') bossTurnLBL(boss,onDone);
+  else onDone&&onDone();
+}
+function findFreeCell(cx,cy,blocked=new Set()){
+  for(let r=1;r<=Math.max(COLS,ROWS);r++){
+    for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+      if(Math.abs(dx)!==r&&Math.abs(dy)!==r)continue;
+      const nx=cx+dx,ny=cy+dy,k=nx+','+ny;
+      if(inBoard(nx,ny)&&isPassableTile(nx,ny)&&!blocked.has(k)&&!unitAt(nx,ny))return [nx,ny];
+    }
+  }
+  return null;
+}
+function evictBossZone(cells){
+  // 原实现逐格搬迁时，先搬出的单位可能又被后续格搬回 BOSS 落点，造成重叠。
+  // 现在先把整个降临区设为保留区，再一次性将所有占用单位搬到区外互不冲突的位置。
+  const blocked=new Set(cells.map(([x,y])=>x+','+y));
+  const occupants=G.units.filter(u=>u.hp>0&&blocked.has(u.x+','+u.y)&&!u.isBoss);
+  const reserved=new Set(blocked);
+  occupants.forEach(u=>{
+    const spot=findFreeCell(u.x,u.y,reserved);
+    if(spot){u.x=spot[0];u.y=spot[1];reserved.add(spot[0]+','+spot[1]);}
+    else{u.hp=0;}
+  });
+  return occupants.length;
+}
+function maybeSpawnBoss(){
+  if(!G.scenario || !G.scenario.hasBoss) return;
+  if(G.bossActive||G.bossDefeated)return;
+  if(G.round < G.scenario.bossStartRound) return;
+  const base = G.scenario.bossBaseChance;
+  const growth = G.scenario.bossGrowth;
+  const maxC = G.scenario.bossMaxChance;
+  const chance = Math.min(maxC, base + (G.round - G.scenario.bossStartRound) * growth);
+  if(Math.random()<chance) spawnBoss();
+}
+function spawnBoss(){
+  if(G.bossActive||G.bossDefeated)return;
+  G.bossActive=true;
+  G.bossTriggered=true;
+  const keys=Object.keys(BOSSES);
+  const key=keys[Math.floor(Math.random()*keys.length)];
+  G.bossKey=key;
+  const b=BOSSES[key];
+
+  const bossZY=zyCells();
+  clearSelection();
+  const evicted=evictBossZone(bossZY);
+  if(evicted)log(`⚠ BOSS 降临区域已清场，${evicted} 名单位被强制转移至外围空位。`,'boss');
+
+  const lateRounds=Math.max(0,G.round-(G.scenario?.bossStartRound||5));
+  const hpMul=1+BOSS_RULES.hpGrowthPerRound*lateRounds;
+  const atkMul=1+BOSS_RULES.atkGrowthPerRound*lateRounds;
+  const scaledHp=Math.round(b.hp*hpMul);
+  const scaledAtk=Math.round(b.atk*atkMul);
+  const boss={
+    id:'boss_'+key,faction:key,type:'boss',
+    short:b.icon,typeName:b.title,
+    x:bossZY[0][0],y:bossZY[0][1],
+    hp:scaledHp,maxHp:scaledHp,atk:scaledAtk,mov:b.mov,
+    moved:false,acted:false,buff:1,movBonus:0,shield:0,
+    energy:0,level:1,exp:0,skillCd:0,
+    rageBuff:false,flagBuff:false,shieldWall:false,zyBuff:false,slow:false,isBoss:true,phase:1
+  };
+  G.units.push(boss);
+  log(`【BOSS 降临】<b style="color:${b.color}">${b.name} · ${b.title}</b> 降临 9013 中枢算力池！三方立即进入联合讨伐。`,'boss');
+  scenarioTag.textContent='联 合 讨 伐';scenarioTag.classList.add('danger');
+  renderUnits();renderHUD();refreshTiles();
+}
