@@ -1,0 +1,319 @@
+se(raw);if(!x||x.version!==SAVE_VERSION||!Array.isArray(x.map)||!x.state)return null;return x;}catch(e){return null;}
+}
+function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}refreshContinueButton();}
+function refreshContinueButton(){
+  const sv=readSave();
+  if(!continueBtn)return;
+  continueBtn.disabled=!sv;
+  if(!sv){continueMeta.textContent='暂无可继续的本地存档';return;}
+  const f=FACTIONS[sv.state.player];const d=new Date(sv.savedAt);const tm=`${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  continueMeta.textContent=`${f?f.name:sv.state.player} · 第 ${sv.state.round||1} 回合 · ${tm}`;
+}
+function showMainMenu(){
+  startEl.classList.remove('hide');mainMenuPanel.classList.add('active');factionPanel.classList.remove('active');refreshContinueButton();
+}
+function showFactionSelect(){mainMenuPanel.classList.remove('active');factionPanel.classList.add('active');buildStart();}
+function restoreGame(){
+  const sv=readSave();if(!sv){refreshContinueButton();return;}
+  try{
+    overEl.classList.remove('show');
+    Object.keys(G).forEach(k=>delete G[k]);Object.assign(G,sv.state);
+    G.selected=null;G.moveCells=[];G.atkCells=[];G.skillCells=[];G.skillMode=false;G.busy=false;G.over=false;
+    MAP=sv.map;
+    logEl.innerHTML=sv.logHtml||'';edictEl.innerHTML=sv.edictHtml||'<b>— 尚 无 诏 令 —</b>';
+    unitEls.forEach(el=>el.remove());unitEls.clear();
+    boardEl.classList.remove('di-dark','boss-zone');
+    buildTiles();renderUnits();renderHUD();refreshTiles();fitBoard();
+    startEl.classList.add('hide');
+    log(`读取本地存档：继续第 ${G.round} 回合。`,'sys');
+    renderUnits();renderHUD();refreshTiles();
+    showSaveToast('存档已载入');
+  }catch(e){console.error(e);clearSave();showSaveToast('存档损坏，已清除');showMainMenu();}
+}
+function renderTutorial(){
+  const st=TUTORIAL_STEPS[tutorialIndex];
+  tutorialStepNum.textContent=`${String(tutorialIndex+1).padStart(2,'0')} / ${String(TUTORIAL_STEPS.length).padStart(2,'0')}`;
+  tutorialTitle.textContent=st.title;tutorialBody.innerHTML=st.body;tutorialDemo.innerHTML=st.demo;
+  tutorialDots.innerHTML=TUTORIAL_STEPS.map((_,i)=>`<span class="tutorial-dot ${i===tutorialIndex?'on':''}"></span>`).join('');
+  tutorialPrev.style.visibility=tutorialIndex===0?'hidden':'visible';
+  tutorialNext.textContent=tutorialIndex===TUTORIAL_STEPS.length-1?(tutorialFromGame?'进入战局':'完成教程'):'下一步';
+}
+function openTutorial(fromGame=false){tutorialFromGame=fromGame;tutorialIndex=0;renderTutorial();tutorialEl.classList.add('open');}
+function closeTutorial(markSeen=true){tutorialEl.classList.remove('open');if(markSeen){try{localStorage.setItem(TUTORIAL_KEY,'1');}catch(e){}}}
+function tutorialSeen(){try{return localStorage.getItem(TUTORIAL_KEY)==='1';}catch(e){return false;}}
+
+if(newGameBtn)newGameBtn.addEventListener('click',showFactionSelect);
+if(factionBackBtn)factionBackBtn.addEventListener('click',showMainMenu);
+if(continueBtn)continueBtn.addEventListener('click',restoreGame);
+const tutorialBtn=document.getElementById('tutorialBtn');if(tutorialBtn)tutorialBtn.addEventListener('click',()=>openTutorial(false));
+if(tutorialPrev)tutorialPrev.addEventListener('click',()=>{if(tutorialIndex>0){tutorialIndex--;renderTutorial();}});
+if(tutorialNext)tutorialNext.addEventListener('click',()=>{if(tutorialIndex<TUTORIAL_STEPS.length-1){tutorialIndex++;renderTutorial();}else closeTutorial(true);});
+if(tutorialSkip)tutorialSkip.addEventListener('click',()=>closeTutorial(true));
+if(saveBtn)saveBtn.addEventListener('click',()=>saveGame(true));
+if(menuBtn)menuBtn.addEventListener('click',()=>{saveGame(false);showMainMenu();showSaveToast('已保存并返回主菜单');});
+window.addEventListener('beforeunload',()=>{if(!G.over&&G.current===G.player&&!G.busy)saveGame(false);});
+
+/* ==================== 开始/重开 ==================== */
+function buildStart(){
+  fcardsEl.innerHTML=START_FACTIONS.map(k=>{
+    const f=FACTIONS[k];
+    return `<button class="fcard" data-f="${k}" style="--c:${f.color}">
+      <div class="fn">${f.name}</div>
+      <div class="fl">${f.label}</div>
+      <div class="fd">${f.motto}</div>
+      <div class="fskill"><b>${f.skill.icon} ${f.skill.name}</b>${f.skill.desc}</div>
+    </button>`;
+  }).join('');
+  // 使用容器委托，避免卡片内部 3D/涟漪子元素导致点击目标变化时失效
+  fcardsEl.onclick=(e)=>{
+    const b=e.target.closest('.fcard');
+    if(!b||!fcardsEl.contains(b))return;
+    const fac=b.dataset.f;
+    if(!FACTIONS[fac])return;
+    G.player=fac;
+    clearSave();
+    startEl.classList.add('hide');
+    startGame();
+    if(!tutorialSeen())setTimeout(()=>openTutorial(true),480);
+  };
+}
+
+function showScenarioReveal(callback){
+  const s=G.scenario;
+  srName.textContent = s.name;
+  srDesc.textContent = s.desc;
+  scenarioReveal.classList.add('on');
+  setTimeout(()=>{
+    scenarioReveal.classList.remove('on');
+    setTimeout(()=>{ if(callback) callback(); },500);
+  },2400);
+}
+
+function startGame(){
+  overEl.classList.remove('show');
+  logEl.innerHTML='';
+  edictEl.innerHTML=`<b>— 尚 无 诏 令 —</b>朝堂之上，执棋者尚未落子。`;
+  G.gold={GYC:50,LLY:50,JYM:50,MXY:0};
+  G.income={GYC:5,LLY:5,JYM:5,MXY:0};
+  G.towns={};
+  G.hand={GYC:[],LLY:[],JYM:[],MXY:[]};
+  G.clinical={bonus:{GYC:0,LLY:0,JYM:0},unlocked:{GYC:{},LLY:{},JYM:{}}};
+  G.battleEvents={enabled:Math.random()<0.65,count:0,max:(Math.random()<0.30?3:2),lastKey:null,
+    lastText:'本局尚无随机事件'};
+  G.battleEvents.lastText=G.battleEvents.enabled?'事件池已启用：战局中可能触发额外事件':'本局未启用额外随机事件';
+  G.duel={chance:0.07,count:0,lastRound:-1,wins:{GYC:0,LLY:0,JYM:0,MXY:0},fights:{GYC:0,LLY:0,JYM:0,MXY:0}};
+  G.mxy={enabled:G.player==='MXY'?true:Math.random()<0.48,spawned:false,defeated:false,won:false,playerControlled:G.player==='MXY',spawnRound:null,events:[],index:0,met:{},observeTicks:0,observeLastRound:-1,balance:{active:false,target:null,damage:0,expiresRound:0},balanceCd:0,lastBalanceTarget:null,lastText:'领主尚未现身'};
+  G.zyNPC={x:1,y:ROWS-2,trust:{...ZY_TRUST_START},lastSupportRound:{GYC:-99,LLY:-99,JYM:-99,MXY:-99},lastStats:{},lastText:'ZY 保持中立，正在观察各方行动'};
+  G.roleProgress={LLY:0,JYM:0};G.roleStage={LLY:false,JYM:false};G.roleVictory=null;G.rebelHeads={LLY:false,JYM:false};G.rebelEndgame={active:false,readyRound:null,failed:false};G.bossRewards=null;
+  G.disaster=null;G.pendingDisaster=null;G.lastDisasterKey=null;
+  G.bossActive=false;G.bossDefeated=false;G.bossTriggered=false;G.bossKey=null;
+  G.stats={damageDealt:{GYC:0,LLY:0,JYM:0},kills:{GYC:0,LLY:0,JYM:0},
+           unitsLost:{GYC:0,LLY:0,JYM:0},bossDamage:{GYC:0,LLY:0,JYM:0},spyRevealed:0};
+  MAJOR_FACTIONS.forEach(snapshotZYStats);
+
+  // 生成随机地图和随机场景
+  G.scenario = rollScenario();
+  MAP = generateMap();
+
+  // 重置收圈
+  G.shrink={active:false,colMin:0,colMax:COLS-1,rowMin:0,rowMax:ROWS-1,nextRound:0,totalShrunk:0};
+
+  boardEl.classList.remove('di-dark','boss-zone');
+  bossBar.classList.remove('on');
+  buildTiles();
+  buildUnits();
+  unitEls.forEach(el=>el.remove());
+  unitEls.clear();
+  G.round=1;G.over=false;G.skillMode=false;
+  clearSelection();
+  if(G.player==='MXY'){G.order=['MXY','GYC','LLY','JYM'];spawnMXY(true);}else{G.order=[G.player,...MAJOR_FACTIONS.filter(k=>k!==G.player)];}
+  G.current=G.player;
+  fitBoard();renderUnits();renderHUD();refreshTiles();
+
+  const pf=FACTIONS[G.player];
+  log(`你选择了 <b style="color:${pf.color}">${pf.name}</b>（${pf.label}）`,'sys');
+  log(`势力技能：<b style="color:${pf.color}">${pf.skill.icon} ${pf.skill.name}</b>`,'skill');
+  log(`战局规则处于迷雾状态：隐藏机制将在实际发生时揭示。`,'evt');
+  log(`◇ ZY 以中立 NPC「量子隐士」身份存在于边缘离线实验室；他不属于任何阵营，信任足够时可请求技术支援。`,'evt');
+  log(`✦ 中央紫色区域为 9013 中枢算力池，不再代表 ZY 实验室。`,'sys');
+  if(G.player==='MXY')log(`♛ 领主胜利：不占城池，依次完成「会盟两方 → 观势入局 → 制衡强权 → 最终裁局」；若天下只剩一方，领主将失去制衡空间。`,'evt');
+  else{log(`✚ 临床系统已启用：三方均可通过战绩逐步解锁全部临床伙伴`,'ally');log(`♜ 多阶段胜利：GYC 击破两方核心后进入收网窗口；LLY 以资源网络与中枢影响开源成势；JYM 以跨战区渗透织成暗网；BOSS 被击败后战局继续。`,'sys');log(`🗺 15×11 地图划分西境 / 中原 / 东境三大战略区；统帅为阵营核心，不会成为卧底。`,'sys');}
+  log(`⚔ 近身交战可能触发阵前单挑，胜负主要取决于双方战力。`,'duel');
+  log(`提示：点右上角 ? 查看完整说明书`,'evt');
+  startTurn(G.player);
+}
+
+document.getElementById('againBtn').addEventListener('click',()=>{
+  overEl.classList.remove('show');
+  clearSave();
+  showMainMenu();
+});
+
+/* ==================== 说明书 ==================== */
+function openManual(){manualEl.classList.add('open');}
+function closeManual(){manualEl.classList.remove('open');}
+document.getElementById('helpBtn').addEventListener('click',openManual);
+document.getElementById('startHelp').addEventListener('click',openManual);
+document.getElementById('manualClose').addEventListener('click',closeManual);
+manualEl.addEventListener('click',e=>{if(e.target===manualEl)closeManual();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&manualEl.classList.contains('open'))closeManual();
+  else if(e.key==='Escape'&&tutorialEl.classList.contains('open'))closeTutorial(false);
+});
+
+/* ==================== 交互动效 ==================== */
+(function enhanceUX(){
+  const glow=document.createElement('div');
+  glow.className='cursor-glow';
+  document.body.appendChild(glow);
+  let mx=0,my=0,cx=0,cy=0;
+  document.addEventListener('mousemove',e=>{
+    mx=e.clientX;my=e.clientY;
+    glow.classList.add('on');
+    const t=e.target.closest('.fcard,.card,.btn,.abtn,.unit');
+    if(t){
+      const c=getComputedStyle(t).getPropertyValue('--c')||'#d4af37';
+      glow.style.background=`radial-gradient(circle,${c}22,${c}08 40%,transparent 70%)`;
+    } else {
+      glow.style.background='radial-gradient(circle,rgba(212,175,55,.14),rgba(212,175,55,.04) 40%,transparent 70%)';
+    }
+  });
+  document.addEventListener('mouseleave',()=>glow.classList.remove('on'));
+  (function tick(){
+    cx+=(mx-cx)*.16;cy+=(my-cy)*.16;
+    glow.style.left=cx+'px';glow.style.top=cy+'px';
+    requestAnimationFrame(tick);
+  })();
+
+  document.addEventListener('pointerdown',e=>{
+    const btn=e.target.closest('.btn,.abtn,.help-btn,.fcard,.card');
+    if(!btn) return;
+    const r=btn.getBoundingClientRect();
+    const size=Math.max(r.width,r.height);
+    const ripple=document.createElement('span');
+    ripple.className='ripple';
+    ripple.style.width=ripple.style.height=size+'px';
+    ripple.style.left=(e.clientX-r.left-size/2)+'px';
+    ripple.style.top =(e.clientY-r.top -size/2)+'px';
+    const old=btn.querySelector('.ripple');
+    if(old) old.remove();
+    btn.appendChild(ripple);
+    setTimeout(()=>ripple.remove(),700);
+  });
+
+  document.addEventListener('mousemove',e=>{
+    const card=e.target.closest('.fcard');
+    if(!card) return;
+    const r=card.getBoundingClientRect();
+    const px=(e.clientX-r.left)/r.width-.5;
+    const py=(e.clientY-r.top )/r.height-.5;
+    card.style.transform=`translateY(-10px) rotateX(${-py*10}deg) rotateY(${px*10}deg)`;
+  });
+  document.addEventListener('mouseout',e=>{
+    const card=e.target.closest('.fcard');
+    if(!card) return;
+    if(card.contains(e.relatedTarget)) return;
+    card.style.transform='';
+  });
+
+  let audioCtx;
+  const beep=(freq=720,dur=0.06,vol=.04)=>{
+    try{
+      if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+      o.type='sine';o.frequency.value=freq;
+      g.gain.setValueAtTime(vol,audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+dur);
+      o.connect(g).connect(audioCtx.destination);
+      o.start();o.stop(audioCtx.currentTime+dur);
+    }catch(e){}
+  };
+  document.addEventListener('pointerdown',e=>{
+    if(e.target.closest('.btn,.abtn'))  beep(680,.05,.035);
+    if(e.target.closest('.card'))       beep(880,.06,.04);
+    if(e.target.closest('.unit'))       beep(520,.04,.03);
+  },{passive:true});
+})();
+
+/* ==================== 启动 ==================== */
+G.scenario = rollScenario();  // 仅作为开始界面后的棋盘占位，不向玩家揭示场景
+MAP = generateMap();
+scenarioTag.textContent = '战 局 未 明';
+buildTiles();
+buildStart();
+showMainMenu();
+refreshContinueButton();
+setTimeout(fitBoard,60);
+window.addEventListener('resize',fitBoard);
+
+
+/* ==================== 第十一版：HUD 标签页与折叠 ==================== */
+(function initHudTabsAndCollapse(){
+  function activateTab(shell,target,remember=true){
+    if(!shell||!target)return;
+    shell.querySelectorAll(':scope > .hud-tabs .hud-tab').forEach(btn=>{
+      const on=btn.dataset.tabTarget===target;
+      btn.classList.toggle('active',on);
+      btn.setAttribute('aria-selected',on?'true':'false');
+      if(on)btn.classList.remove('has-alert');
+    });
+    shell.querySelectorAll(':scope > .hud-tab-pane').forEach(pane=>pane.classList.toggle('active',pane.dataset.tabPane===target));
+    if(remember){
+      try{localStorage.setItem('9014-hud-'+shell.dataset.tabGroup,target);}catch(e){}
+    }
+  }
+
+  document.querySelectorAll('.hud-tab-shell').forEach(shell=>{
+    shell.querySelectorAll(':scope > .hud-tabs .hud-tab').forEach(btn=>{
+      btn.addEventListener('click',()=>activateTab(shell,btn.dataset.tabTarget));
+    });
+    let saved='';
+    try{saved=localStorage.getItem('9014-hud-'+shell.dataset.tabGroup)||'';}catch(e){}
+    const valid=saved&&shell.querySelector(`:scope > .hud-tabs .hud-tab[data-tab-target="${saved}"]`);
+    if(valid)activateTab(shell,saved,false);
+  });
+
+  document.querySelectorAll('.collapsible-panel>.panel-h').forEach(head=>{
+    head.setAttribute('title','点击折叠 / 展开');
+    head.setAttribute('role','button');
+    head.setAttribute('tabindex','0');
+    head.setAttribute('aria-expanded','true');
+    const toggle=()=>{
+      const panel=head.parentElement;
+      const collapsed=panel.classList.toggle('is-collapsed');
+      head.setAttribute('aria-expanded',collapsed?'false':'true');
+    };
+    head.addEventListener('click',toggle);
+    head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
+  });
+
+  // 战报在后台增长时，用红点提示，但不强制抢走玩家当前标签页。
+  const logNode=document.getElementById('log');
+  const rightShell=document.querySelector('.hud-tab-shell[data-tab-group="right"]');
+  const reportBtn=rightShell?.querySelector('.hud-tab[data-tab-target="report"]');
+  if(logNode&&reportBtn){
+    new MutationObserver(()=>{
+      if(!reportBtn.classList.contains('active'))reportBtn.classList.add('has-alert');
+    }).observe(logNode,{childList:true});
+  }
+
+  // 天灾/收圈真正激活后，在“战局”标签上给提示点；MXY现身后提示“势力”标签。
+  const leftShell=document.querySelector('.hud-tab-shell[data-tab-group="left"]');
+  if(leftShell){
+    const battleBtn=leftShell.querySelector('.hud-tab[data-tab-target="battle"]');
+    const factionBtn=leftShell.querySelector('.hud-tab[data-tab-target="faction"]');
+    const syncAlerts=()=>{
+      const hazard=document.getElementById('disasterPanel')?.classList.contains('active')||document.getElementById('zonePanel')?.classList.contains('active');
+      if(hazard&&!battleBtn.classList.contains('active'))battleBtn.classList.add('has-alert');
+      const mxyPanel=document.querySelector('.mxy-panel');
+      const mxyVisible=mxyPanel&&getComputedStyle(mxyPanel).display!=='none';
+      if(mxyVisible&&!factionBtn.classList.contains('active'))factionBtn.classList.add('has-alert');
+    };
+    const watch=new MutationObserver(syncAlerts);
+    const dis=document.getElementById('disasterPanel'),zone=document.getElementById('zonePanel'),mxy=document.querySelector('.mxy-panel');
+    if(dis)watch.observe(dis,{attributes:true,attributeFilter:['class']});
+    if(zone)watch.observe(zone,{attributes:true,attributeFilter:['class']});
+    if(mxy)watch.observe(mxy,{attributes:true,attributeFilter:['style','class']});
+    syncAlerts();
+  }
+})();
