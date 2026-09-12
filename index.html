@@ -135,7 +135,7 @@
   const __announceBoss090=announceBoss;announceBoss=function(b){__announceBoss090(b);dbDesc.textContent=\`⚠ 共同危机：优先击败 \${b.name} · 讨伐后恢复身份终局\`;};
 })();
 `;
-    js += gameplayPatch;
+    js += gameplayPatch.replace(/\\`/g,'`').replace(/\\\$\\\{/g,'${');
 
     new Function(js);
     const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
