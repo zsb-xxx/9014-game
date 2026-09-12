@@ -1,0 +1,355 @@
+
+<div class="stars"></div>
+
+<div class="boss-bar" id="bossBar">
+  <div class="bb-name" id="bossBarName">✵ BOSS</div>
+  <div class="bb-hp"><i id="bossHpBar" style="width:100%"></i></div>
+  <div class="bb-val" id="bossHpVal">600 / 600</div>
+</div>
+
+<div class="disaster-flash" id="disFlash"></div>
+<div class="disaster-banner" id="disBanner">
+  <div class="db-ico" id="dbIco">☄️</div>
+  <div class="db-txt">
+    <div class="db-name" id="dbName">陨 石 雨</div>
+    <div class="db-desc" id="dbDesc">天降火雨</div>
+  </div>
+</div>
+
+<div class="event-banner" id="battleEventBanner">
+  <div class="eb-ico" id="battleEventIco">✚</div>
+  <div>
+    <div class="eb-name" id="battleEventName">随 机 事 件</div>
+    <div class="eb-desc" id="battleEventDesc"></div>
+  </div>
+</div>
+
+
+<div class="duel-flash" id="duelFlash"></div>
+<div class="duel-banner" id="duelBanner">
+  <div class="duel-title">⚔ 阵 前 单 挑 ⚔</div>
+  <div class="duel-match">
+    <div class="duel-side" id="duelSideA">
+      <div class="ds-name" id="duelNameA">—</div>
+      <div class="ds-power">战力 <span id="duelPowerA">0</span> · 临阵 <span class="ds-roll" id="duelRollA">0</span></div>
+    </div>
+    <div class="duel-vs">VS</div>
+    <div class="duel-side right" id="duelSideB">
+      <div class="ds-name" id="duelNameB">—</div>
+      <div class="ds-power">战力 <span id="duelPowerB">0</span> · 临阵 <span class="ds-roll" id="duelRollB">0</span></div>
+    </div>
+  </div>
+  <div class="duel-result" id="duelResult">—</div>
+</div>
+
+<div class="scenario-reveal" id="scenarioReveal">
+  <div class="sr-box">
+    <div class="sr-label">本 局 场 景</div>
+    <div class="sr-name" id="srName">三 分 稳 局</div>
+    <div class="sr-desc" id="srDesc"></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="top">
+    <h1><span class="num">9014</span> · 战 棋</h1>
+    <p>科 研 权 谋 · 每 局 皆 不 同</p>
+    <div class="scenario-tag" id="scenarioTag">战 局 未 明</div>
+    <div class="top-actions">
+      <button class="top-mini-btn" id="saveBtn" type="button" title="保存当前进度">保 存</button>
+      <button class="top-mini-btn" id="menuBtn" type="button" title="保存并返回开始界面">主 菜 单</button>
+    </div>
+    <button class="help-btn" id="helpBtn" title="游戏说明">?</button>
+  </header>
+
+  <div class="game">
+    <aside class="side side-left">
+      <div class="panel turn-panel">
+        <div class="panel-h static-h">当 前 回 合</div>
+        <div class="turn-badge">
+          <div class="turn-dot" id="turnDot"></div>
+          <div style="flex:1;min-width:0">
+            <div class="turn-name" id="turnName">—</div>
+            <div class="turn-sub" id="turnSub">等待开始</div>
+          </div>
+        </div>
+        <div class="turn-count"><span>回 合</span><b id="turnNum">1</b></div>
+        <button class="btn" id="endTurn" style="margin-top:10px">结 束 回 合</button>
+      </div>
+
+      <div class="hud-tab-shell" data-tab-group="left">
+        <div class="hud-tabs" role="tablist" aria-label="左侧信息分类">
+          <button class="hud-tab active" type="button" data-tab-target="battle" role="tab" aria-selected="true"><span>◈</span> 战 局</button>
+          <button class="hud-tab" type="button" data-tab-target="growth" role="tab" aria-selected="false"><span>✦</span> 发 展</button>
+          <button class="hud-tab" type="button" data-tab-target="faction" role="tab" aria-selected="false"><span>♜</span> 势 力</button>
+        </div>
+
+        <div class="hud-tab-pane active" data-tab-pane="battle" role="tabpanel">
+          <div class="panel zone-panel collapsible-panel" id="zonePanel">
+            <div class="panel-h">安 全 区</div>
+            <div class="panel-body">
+              <div class="zone-info calm" id="zoneInfo"><div class="zdesc">本局无收圈机制</div></div>
+            </div>
+          </div>
+
+          <div class="panel disaster-panel collapsible-panel" id="disasterPanel">
+            <div class="panel-h">天 灾 情 报</div>
+            <div class="panel-body">
+              <div class="disaster-info calm" id="disasterInfo">
+                <div class="dhead">☀ 天 象 平 稳</div>
+                <div class="ddesc">暂无灾害，但乌云正在汇聚……</div>
+              </div>
+              <div class="disaster-progress" id="disProgress" style="display:none"><i id="disProgressBar" style="width:0%"></i></div>
+            </div>
+          </div>
+
+          <div class="panel collapsible-panel">
+            <div class="panel-h">9 0 1 3 诏 令</div>
+            <div class="panel-body">
+              <div class="edict" id="edict"><b>— 尚 无 诏 令 —</b>朝堂之上，执棋者尚未落子。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-tab-pane" data-tab-pane="growth" role="tabpanel">
+          <div class="panel cards-panel collapsible-panel">
+            <div class="panel-h">功 能 卡</div>
+            <div class="panel-body"><div class="cards-grid" id="cardsGrid"></div></div>
+          </div>
+
+          <div class="panel collapsible-panel">
+            <div class="panel-h">势 力 资 源</div>
+            <div class="panel-body">
+              <div class="res-grid">
+                <div class="res-item"><span>金币</span><b id="resGold">50</b></div>
+                <div class="res-item"><span>收入</span><b class="g" id="resIncome">+5</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel clinical-panel collapsible-panel">
+            <div class="panel-h">临 床 系 统</div>
+            <div class="panel-body">
+              <div id="clinicalInfo"><div class="clinic-last-event">达到协作条件后，临床伙伴会自动进入战场支援。</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-tab-pane" data-tab-pane="faction" role="tabpanel">
+          <div class="panel collapsible-panel">
+            <div class="panel-h">势 力 技 能</div>
+            <div class="panel-body">
+              <div class="skill-box" id="factionSkill" style="--c:#666"><b>— 尚 未 开 局 —</b>选择势力后查看专属技能</div>
+            </div>
+          </div>
+
+          <div class="panel zy-panel collapsible-panel">
+            <div class="panel-h">ZY · 量 子 隐 士</div>
+            <div class="panel-body">
+              <div class="zy-npc-info" id="zyNpcInfo">ZY 保持中立，正在观察各方行动。</div>
+              <button class="btn ghost zy-support-btn" id="zyRequestBtn" type="button" style="margin-top:8px">请 求 技 术 支 援</button>
+            </div>
+          </div>
+
+          <div class="panel mxy-panel collapsible-panel" style="display:none">
+            <div class="panel-h">领 主 事 件</div>
+            <div class="panel-body">
+              <div class="mxy-info" id="mxyInfo"><div class="clinic-last-event">MXY · 领主并非每局都会现身；一旦出现，将以完成事件链为目标。</div></div>
+            </div>
+          </div>
+
+          <div class="panel collapsible-panel">
+            <div class="panel-h">势 力 战 况</div>
+            <div class="panel-body"><div id="factList"></div></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="board-wrap">
+      <div class="board" id="board">
+        <div class="tiles" id="tiles"></div>
+        <div class="fx" id="fx"></div>
+        <div class="units" id="units"></div>
+      </div>
+    </main>
+
+    <aside class="side side-right">
+      <div class="hud-tab-shell right-tab-shell" data-tab-group="right">
+        <div class="hud-tabs right-tabs" role="tablist" aria-label="右侧信息分类">
+          <button class="hud-tab active" type="button" data-tab-target="unit" role="tab" aria-selected="true"><span>◎</span> 单 位</button>
+          <button class="hud-tab" type="button" data-tab-target="report" role="tab" aria-selected="false"><span>☰</span> 战 报</button>
+          <button class="hud-tab" type="button" data-tab-target="legend" role="tab" aria-selected="false"><span>◇</span> 图 例</button>
+        </div>
+
+        <div class="hud-tab-pane active" data-tab-pane="unit" role="tabpanel">
+          <div class="panel unit-panel">
+            <div class="panel-h static-h">单 位 情 报</div>
+            <div class="unit-info" id="unitInfo">
+              <div class="ui-empty">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                  <circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/>
+                </svg>
+                点击单位查看情报
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-tab-pane" data-tab-pane="report" role="tabpanel">
+          <div class="panel report-panel">
+            <div class="panel-h static-h">战 报</div>
+            <div class="log" id="log"></div>
+          </div>
+        </div>
+
+        <div class="hud-tab-pane" data-tab-pane="legend" role="tabpanel">
+          <div class="panel legend-panel">
+            <div class="panel-h static-h">图 例</div>
+            <div class="legend">
+              <div class="lg"><span class="dot mv"></span>移动</div>
+              <div class="lg"><span class="dot at"></span>攻击</div>
+              <div class="lg"><span class="dot sk"></span>技能</div>
+              <div class="lg"><span class="dot bs"></span>BOSS</div>
+              <div class="lg"><span class="dot spy"></span>卧底</div>
+              <div class="lg"><span class="dot zone"></span>安全区外</div>
+            </div>
+            <div class="tab-tip">提示：鼠标悬停地图格，可查看当前地形与即时效果。</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="start" id="start">
+  <div class="start-shell">
+    <div class="start-brand">9014 · 战 棋</div>
+    <div class="start-kicker">科 研 权 谋 · 独 立 战 棋 改 编</div>
+
+    <div class="start-panel active" id="mainMenuPanel">
+      <div class="start-menu">
+        <button class="start-main-btn" id="newGameBtn" type="button">新 游 戏</button>
+        <button class="start-main-btn" id="continueBtn" type="button" disabled>继 续 游 戏</button>
+        <div class="continue-meta" id="continueMeta">暂无可继续的本地存档</div>
+        <button class="start-main-btn secondary" id="tutorialBtn" type="button">新 手 教 程</button>
+        <button class="start-main-btn secondary" id="startHelp" type="button">游 戏 说 明</button>
+      </div>
+      <div class="start-save-note">游戏会在你的回合中自动保存；浏览器本地存档保留时，下次可从「继续游戏」恢复。</div>
+    </div>
+
+    <div class="start-panel" id="factionPanel">
+      <div class="faction-title">选 择 身 份</div>
+      <div class="faction-sub">不同身份拥有不同的资源、战术与特殊胜利路线</div>
+      <div class="fcards" id="fcards"></div>
+      <button class="start-main-btn secondary start-back" id="factionBackBtn" type="button" style="max-width:260px">返 回</button>
+    </div>
+
+    <div class="start-disclaimer">
+      <b>虚构声明：</b>本游戏为独立虚构作品。人物代号、组织、机构、地点、技术、冲突与事件均为虚构或艺术化处理，如与现实人物或事件雷同纯属巧合。游戏仅借鉴《9014 科研权谋》的部分世界观氛围与创作灵感，玩法、阵营关系与结局均为独立改编，不代表小说原剧情。
+    </div>
+  </div>
+</div>
+
+<div class="tutorial" id="tutorial">
+  <div class="tutorial-box">
+    <div class="tutorial-step-num" id="tutorialStepNum">01 / 06</div>
+    <div class="tutorial-title" id="tutorialTitle">先看胜利目标</div>
+    <div class="tutorial-body" id="tutorialBody"></div>
+    <div class="tutorial-demo" id="tutorialDemo"></div>
+    <div class="tutorial-dots" id="tutorialDots"></div>
+    <div class="tutorial-actions">
+      <button class="tutorial-skip" id="tutorialSkip" type="button">跳过教程</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn ghost" id="tutorialPrev" type="button">上一步</button>
+        <button class="btn" id="tutorialNext" type="button">下一步</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="save-toast" id="saveToast">进度已保存</div>
+
+<div class="over" id="over">
+  <div class="over-box" id="overBox">
+    <div class="over-emblem" id="overEmblem">✦</div>
+    <div class="ot" id="overTitle">天 下 归 一</div>
+    <div class="os" id="overSub"></div>
+    <div class="over-divider"></div>
+    <div class="over-stats" id="overStats"></div>
+    <div id="overExtra"></div>
+    <div class="over-btns">
+      <button class="btn" id="againBtn">再 战 一 局</button>
+    </div>
+  </div>
+</div>
+
+<div class="manual" id="manual">
+  <div class="manual-box">
+    <button class="manual-close" id="manualClose">×</button>
+    <h3>游 戏 说 明 书</h3>
+    <div class="m-sub">9014 · 战 棋 · 公 开 试 玩 版</div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">公 开 试 玩 声 明</div>
+      <p><b>本游戏人物、组织、机构、地点、技术与事件均为虚构或艺术化处理，如有雷同纯属巧合。</b>本作仅借鉴《9014 科研权谋》的部分世界观氛围与创作灵感，战棋机制、阵营关系、随机事件和结局均为独立改编，不等同于小说原剧情。</p>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">新 手 入 门</div>
+      <p>第一次游玩建议先完成开始界面的「新手教程」。最重要的顺序只有四步：<b>确认自己的特殊胜利目标 → 点击己方单位 → 移动/攻击/技能 → 结束回合</b>。BOSS、卧底、天灾、ZY支援等机制会在真正发生时再处理，不需要开局全部记住。</p>
+      <p style="margin-top:8px">游戏在你的可操作回合中自动写入浏览器本地存档，也可点击顶部「保存」。返回主菜单或关闭网页后，只要浏览器没有清除本站本地数据，即可使用「继续游戏」恢复。</p>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">游 戏 目 标</div>
+      <p>开局可选择 <b>GYC / LLY / JYM / MXY</b> 四种身份。GYC、LLY、JYM 参与常规争霸并拥有不同的身份胜利捷径；MXY 的代号为<b>「领主」</b>，不占一城一池，以会盟、观势、制衡与最终裁局完成权谋胜利。若玩家未选择 MXY，领主仍可能在战局中作为独立特殊棋子现身。</p>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">♜ 身 份 胜 利 机 制</div>
+      <div class="m-row"><div class="m-ico" style="--c:#e74c3c">反</div><div><b>GYC · 破局者</b> · 必须亲自击破 LLY / JYM 两名统帅。2/2 后进入「收网时刻」终局窗口，只有己方统帅再存活一个完整回合才可定局；若统帅在窗口内阵亡，特殊胜利失败。统帅不会成为卧底。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#3498db">侯</div><div><b>LLY · 碧游村</b> · 国库达到 100 金；有节点地图还需控制至少一个算力节点；同时至少两名核心棋子驻守中枢，连续保持三个本势力回合完成「开源成势」。<br><b>JYM · 暗网派</b> · 地图划分西境 / 中原 / 东境；在任意两个战区的核心驻军数量严格领先每个对手，同时至少一名核心棋子驻守中枢，连续保持两个本势力回合完成「暗网织局」。</div></div>
+      <p style="margin-top:8px">身份捷径在 BOSS 联合讨伐期间暂停，击败 BOSS 仍是共同目标。</p>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">♛ M X Y · 领 主</div>
+      <p style="margin-bottom:10px">MXY 的代号为<b>「领主」</b>。他不占城、不守中枢，也不以消灭三方为目标，而是通过四段权谋博弈改变战场格局：<b>合纵、观势、制衡、裁局</b>。四段全部完成即取得特殊胜利；若天下提前只剩一方主要势力，领主失去制衡空间。</p>
+      <div class="m-row"><div class="m-ico" style="--c:#f0d879">盟</div><div><b>合纵 · 会盟两方</b> · 接近两个不同势力的统帅或继任代表完成正式会盟。第三方军队干扰时，可发动「遣使」创造外交窗口。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#f0d879">观</div><div><b>观势 · 身入局中</b> · 领主需要主动进入两方主要势力的对峙区域，在两军附近完成两次观势。BOSS 联合讨伐期间不计入观势。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#f0d879">衡</div><div><b>制衡 · 借力打力</b> · 靠近当前实力最强势力的代表后发动「制衡令」。短期内其他 AI 会更倾向压制该势力；只有它真正受到其他主要势力足够伤害，才算制衡成功。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#f0d879">裁</div><div><b>裁局 · 无土定鼎</b> · 制衡完成后，至少仍需两方主要势力存续。领主必须亲赴另一方代表身边完成最终裁局，证明自己并非靠某一方独大取胜。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#f0d879">独</div><div><b>独行之主</b> · MXY 只有一名领主棋子，拥有更强机动与耐久并在自己的回合开始恢复少量兵力；领主阵亡则权谋路线失败。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#f0d879">使</div><div><b>遣使</b> · 会盟阶段的护行技能。受到伤害降低、三方降低追击优先级，但护行期间不能主动攻击，并不会自动完成会盟。</div></div>    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">🌍 随 机 场 景 系 统</div>
+      <p style="margin-bottom:10px">
+        每一局开始时，系统会随机生成：<b>地图地形</b>和<b>隐藏规则</b>。
+        隐藏规则不会在开局提前公开，只有当相关机制真正发生时才会揭示。
+      </p>
+      <div class="m-row"><div class="m-ico" style="--c:#7ee08a">地</div>
+        <div><b>随机地形</b> · 地图扩大为 15×11；除中央 9013 中枢算力池外，森林 / 山地 / 河流 / 丘陵 / 算力节点均随机生成，并会形成河带与局部地形片区</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#ff5b3a">圈</div>
+        <div><b>收圈机制</b> · 若本局启用，从第 5 回合起每 2 回合缩 1 格</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#ff2a4a">✵</div>
+        <div><b>BOSS 降临</b> · 若本局启用，第 5 回合起 BOSS 可能降临，降临后三方转为联合讨伐</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#9b59b6">灾</div>
+        <div><b>天灾机制</b> · 若本局启用，第 2 回合起战局中可能出现不同类型天灾</div></div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">☠ 收 圈 机 制（安 全 区）</div>
+      <p style="margin-bottom:10px">
+        本局若有收圈规则，从 <b>第 5 回合</b> 开始，每 <b>2 回合</b> 收缩一次安全区。
+        每次随机收缩一边（左/右/上/下），向内缩 1 格。
+      </p>
+      <div class="m-row"><div class="m-ico" style="--c:#ff5b3a">🔥</div>
+        <div><b>圈外危险</b> · 处于安全区外的单位，每回合开始损失 <b>当前兵力的 50%</b>！</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#ffd166">⚠</div>
+        <div><b>视觉提示</b> · 圈外格子被红色覆盖，安全区边界有橙色描边</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#7ee08a">✓</div>
+        <div><b>AI 会主动</b>避开圈外，玩家也应及时撤回安全区</div></div>
+    </div>
+
+    <div clas
