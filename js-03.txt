@@ -1,0 +1,266 @@
+救治 ${targets.length} 人`,'ally');
+  }
+  if(active.some(u=>u.clinicalKey==='nurse')){
+    const u=allies().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];
+    if(u){const before=u.shield||0;u.shield=Math.min(75,before+25);const add=u.shield-before;if(add>0)float(u,add,'shield');log(`✚ ${factionName(fac)} · 急诊护士为 ${u.typeName} 补充 ${add} 护盾`,'ally');}
+  }
+  if(active.some(u=>u.clinicalKey==='chief')){
+    allies().forEach(u=>{u.energy=Math.min(100,u.energy+10);u.buff=(u.buff||1)*1.08;});
+    log(`✚ ${factionName(fac)} · 临床主任统筹会诊：全体 +10 能量、攻击 +8%`,'ally');
+  }
+}
+
+function renderClinicalPanel(){
+  if(!clinicalInfo)return;
+  if(G.player==='MXY'){clinicalInfo.innerHTML='<div class="clinic-last-event">领主不使用临床伙伴系统；胜利核心为合纵、观势与制衡三方力量。</div>';return;}
+  if(!G.player||!G.clinical){clinicalInfo.innerHTML='<div class="clinic-last-event">选择势力后查看临床协作进度。</div>';return;}
+  const score=clinicalScore(G.player);
+  const unlocked=G.clinical.unlocked[G.player]||{};
+  const roster=CLINICAL_PARTNERS.map(p=>{
+    const ok=!!unlocked[p.key];
+    const state=ok?'已解锁':`${Math.min(score,p.threshold)}/${p.threshold}`;
+    return `<div class="clinic-partner ${ok?'unlocked':''}">
+      <div class="cp-ico">${p.icon}</div><div><div class="cp-name">${p.name}</div><div class="cp-desc">${p.desc}</div></div>
+      <div class="cp-state">${state}</div></div>`;
+  }).join('');
+  const facs=['GYC','LLY','JYM'].map(f=>{
+    const n=CLINICAL_PARTNERS.filter(p=>G.clinical.unlocked[f]&&G.clinical.unlocked[f][p.key]).length;
+    return `<span style="border-color:${factionColor(f)}55;color:${factionColor(f)}">${f} ${n}/${CLINICAL_PARTNERS.length}</span>`;
+  }).join('');
+  clinicalInfo.innerHTML=`<div class="clinic-score"><span>你方临床协作</span><b>${score}</b></div>
+    <div class="clinic-roster">${roster}</div><div class="clinic-factions">${facs}</div>
+    <div class="clinic-last-event"><b>随机事件：</b>${G.battleEvents.lastText||'本局尚无随机事件'}</div>`;
+}
+
+function showBattleEvent(ev,result){
+  if(!battleEventBanner)return;
+  battleEventIco.textContent=ev.icon;battleEventName.textContent=ev.name;
+  battleEventDesc.textContent=result||ev.desc;
+  battleEventBanner.classList.remove('on');void battleEventBanner.offsetWidth;
+  battleEventBanner.classList.add('on');
+  setTimeout(()=>battleEventBanner.classList.remove('on'),1900);
+}
+
+function maybeTriggerBattleEvent(){
+  const be=G.battleEvents;
+  if(!be||!be.enabled||G.round<2||be.count>=be.max)return;
+  if(Math.random()>=0.16)return;
+  const pool=BATTLE_EVENTS.filter(e=>e.key!==be.lastKey);
+  const ev=pool[Math.floor(Math.random()*pool.length)];
+  const result=ev.apply();
+  be.count++;be.lastKey=ev.key;be.lastText=`${ev.icon} ${ev.name} · ${result}`;
+  log(`【随机事件】<b>${ev.icon} ${ev.name}</b> · ${result}`,'evt');
+  ['GYC','LLY','JYM'].forEach(checkClinicalUnlocks);
+  showBattleEvent(ev,result);
+  renderUnits();refreshTiles();
+}
+
+/* ==================== MXY · 领主事件系统 ==================== */
+const MAJOR_FACTIONS=['GYC','LLY','JYM'];
+function mxyAlive(){return G.units.find(u=>u.isMXY&&u.hp>0);}
+function mxyEventPool(){
+  // 领主不以占地或单纯存活取胜，而以三段固定权谋链完成胜利。
+  return [
+    {key:'meet',name:'合纵 · 会盟两方',desc:'与两个不同势力的统帅或继任代表完成正式会盟'},
+    {key:'observe',name:'观势 · 身入局中',desc:'主动进入两方主要势力的对峙区域，完成两次观势'},
+    {key:'balance',name:'制衡 · 借力打力',desc:'对当前最强势力发布制衡令，并促成其他主要势力对其造成足够伤害'},
+    {key:'verdict',name:'裁局 · 无土定鼎',desc:'制衡完成后，在至少两方诸势力仍存续时，亲赴另一方代表身边完成最终裁局'}
+  ];
+}
+function initMXYEvents(){
+  G.mxy.events=mxyEventPool().map(e=>({...e,done:false}));G.mxy.index=0;G.mxy.met={};
+  G.mxy.observeTicks=0;G.mxy.observeLastRound=-1;G.mxy.balance={active:false,target:null,damage:0,expiresRound:0};G.mxy.balanceCd=0;G.mxy.lastBalanceTarget=null;
+}
+function currentMXYEvent(){return G.mxy&&G.mxy.events?G.mxy.events[G.mxy.index]:null;}
+function mxyEventProgress(ev){
+  if(!ev)return '';if(ev.done)return '已完成';
+  if(ev.key==='meet')return `${Object.keys(G.mxy.met||{}).length}/2`;
+  if(ev.key==='observe')return `${Math.min(2,G.mxy.observeTicks||0)}/2`;
+  if(ev.key==='balance'){const b=G.mxy.balance||{};return b.active?`${Math.min(MXY_BALANCE_SKILL.requiredDamage,b.damage||0)}/${MXY_BALANCE_SKILL.requiredDamage}`:'待施令';}
+  if(ev.key==='verdict')return '待裁局';
+  return '进行中';
+}
+function renderMXYPanel(){
+  if(!mxyInfo)return;const state=G.mxy;const panel=mxyInfo.closest('.mxy-panel');
+  if(!state||!state.spawned){if(panel)panel.style.display='none';return;}
+  if(panel)panel.style.display='';
+  const m=mxyAlive();const status=state.won?'事件胜利':state.defeated?'已被击败':m?`兵力 ${Math.max(0,m.hp)}/${m.maxHp}${m.envoy?' · ✉护行':''}`:'事件链终止';
+  const events=(state.events||[]).map((e,i)=>`<div class="mxy-event ${e.done?'done':i===state.index?'active':''}"><div class="me-name">${e.done?'✓':'·'} ${e.name}<span style="float:right;font-family:var(--font-mono)">${mxyEventProgress(e)}</span></div><div class="me-desc">${e.desc}</div></div>`).join('');
+  let tacticHint='';const cur=currentMXYEvent();
+  if(m&&cur&&cur.key==='meet'){
+    const left=MAJOR_FACTIONS.filter(f=>!state.met[f]&&mxyRepresentative(f)).map(f=>{const r=mxyRepresentative(f);return `${factionName(f)}：${r.type==='lord'?'统帅':'继任 '+r.typeName}`;});
+    tacticHint=`<div class="clinic-last-event"><b>会盟代表：</b>${left.length?left.join(' · '):'暂无可用代表'}${m.envoy?' · <span style="color:#f0d879">遣使护行中</span>':''}</div>`;
+  } else if(m&&cur&&cur.key==='observe'){
+    const fs=mxyObserveFactions(m);tacticHint=`<div class="clinic-last-event"><b>观势范围：</b>两格内势力 ${fs.length?fs.map(f=>factionName(f)).join(' · '):'不足两方'} · BOSS 联合讨伐期间暂停计数</div>`;
+  } else if(m&&cur&&cur.key==='balance'){
+    const target=mxyStrongestFaction();const rep=target?mxyRepresentative(target):null;const b=state.balance||{};
+    tacticHint=`<div class="clinic-last-event"><b>当前强权：</b>${target?factionName(target):'暂无'}${rep?` · 距代表 ${cheb(m,rep)} 格`:''}${b.active?` · <span style="color:#f0d879">制衡中 ${b.damage||0}/${MXY_BALANCE_SKILL.requiredDamage}</span>`:` · 制衡令 CD ${state.balanceCd||0}`}</div>`;
+  }
+  mxyInfo.innerHTML=`<div class="mxy-head"><b>♛ MXY · 领主</b><span>${status}</span></div>${events}${tacticHint}<div class="clinic-last-event"><b>当前：</b>${state.lastText||'正在推进权谋链'}</div>`;
+}
+function showMXYNotice(name,desc){showBattleEvent({icon:'♛',name},desc);}
+function findMXYSpawn(){
+  const cells=[];for(let x=0;x<COLS;x++){cells.push([x,0],[x,ROWS-1]);}for(let y=1;y<ROWS-1;y++){cells.push([0,y],[COLS-1,y]);}
+  const safe=cells.filter(([x,y])=>isPassableTile(x,y)&&!unitAt(x,y)&&inSafeZone(x,y)&&!G.units.some(u=>u.hp>0&&MAJOR_FACTIONS.includes(u.faction)&&Math.max(Math.abs(u.x-x),Math.abs(u.y-y))<=2));
+  const ok=safe.length?safe:cells.filter(([x,y])=>isPassableTile(x,y)&&!unitAt(x,y)&&inSafeZone(x,y));return ok.length?ok[Math.floor(Math.random()*ok.length)]:null;
+}
+function spawnMXY(playerControlled=false){
+  if(G.mxy.spawned||G.mxy.defeated||G.mxy.won)return;const spot=findMXYSpawn();if(!spot)return;const t=TYPES.mxy_lord;
+  const m={id:'mxy_lord',faction:'MXY',type:'mxy_lord',short:t.short,typeName:t.name,x:spot[0],y:spot[1],hp:t.hp,maxHp:t.hp,atk:t.atk,mov:t.mov,moved:false,acted:false,buff:1,movBonus:0,shield:0,energy:50,level:1,exp:0,skillCd:0,rageBuff:false,flagBuff:false,shieldWall:false,zyBuff:false,slow:false,isMXY:true,envoy:false};
+  G.units.push(m);G.mxy.spawned=true;G.mxy.spawnRound=G.round;G.mxy.playerControlled=playerControlled;G.mxy.lastText=playerControlled?'你已以领主身份入局，推进事件链即可取胜':'领主已经入局，事件链开始推进';initMXYEvents();
+  if(playerControlled){showMXYNotice('领 主 入 局','你控制 MXY · 领主：完成四段权谋链即可取得特殊胜利');log(`♛ 你选择了 <b style="color:${factionColor('MXY')}">MXY · 领主</b>；无需歼灭三方，完成 4 段权谋链即可获胜。`,'evt');}
+  else{showMXYNotice('领 主 现 身','MXY · 领主进入战场：阻止其完成四段权谋链');log(`♛ <b style="color:${factionColor('MXY')}">MXY · 领主</b> 进入战场；其胜利目标并非歼灭，而是完成 4 段权谋链。`,'evt');}
+  renderUnits();renderHUD();
+}
+function maybeSpawnMXY(){
+  if(G.player==='MXY'||G.over||!G.mxy||!G.mxy.enabled||G.mxy.spawned||G.mxy.defeated||G.bossActive||G.round<3)return;
+  const rate=Math.min(0.42,0.12+(G.round-3)*0.055);if(Math.random()<rate)spawnMXY();
+}
+function mxyRepresentative(fac){
+  const core=G.units.filter(u=>u.hp>0&&u.faction===fac&&['lord','brave','sage','guard'].includes(u.type));
+  if(!core.length)return null;
+  const lord=core.find(u=>u.type==='lord');
+  if(lord)return lord;
+  return core.slice().sort((a,b)=>(b.level||1)-(a.level||1)||b.hp-a.hp)[0];
+}
+function mxyThirdPartyThreat(m,rep,fac){
+  return G.units.some(u=>u.hp>0&&MAJOR_FACTIONS.includes(u.faction)&&u.faction!==fac&&
+    (cheb(u,m)<=1||cheb(u,rep)<=1));
+}
+function mxyMeetStatus(m,fac){
+  const rep=mxyRepresentative(fac);
+  if(!rep)return {ok:false,rep:null,reason:'该势力已无可会盟代表'};
+  if(cheb(rep,m)>1)return {ok:false,rep,reason:`需接近 ${rep.type==='lord'?'统帅':'继任代表'} · ${rep.typeName}`};
+  if(mxyThirdPartyThreat(m,rep,fac)&&!m.envoy)return {ok:false,rep,reason:'会盟地点附近存在第三方敌军，可先使用「遣使」'};
+  return {ok:true,rep,reason:m.envoy?'遣使护行下完成会盟':'局势稳定，完成会盟'};
+}
+function mxyObserveFactions(m){
+  if(!m||G.bossActive)return [];
+  return MAJOR_FACTIONS.filter(f=>G.units.some(u=>u.hp>0&&u.faction===f&&['lord','brave','sage','guard'].includes(u.type)&&cheb(u,m)<=2));
+}
+function recordMXYObserve(m){
+  if(!m||currentMXYEvent()?.key!=='observe'||G.bossActive)return;
+  const fs=mxyObserveFactions(m);
+  if(fs.length<2||G.mxy.observeLastRound===G.round)return;
+  G.mxy.observeLastRound=G.round;G.mxy.observeTicks=(G.mxy.observeTicks||0)+1;
+  G.mxy.lastText=`观势成功：近旁 ${fs.slice(0,2).map(f=>factionName(f)).join(' / ')}`;
+  log(`♛ <b>观势</b>：MXY 身处 ${fs.slice(0,2).map(f=>factionName(f)).join(' 与 ')} 对峙范围，进度 ${G.mxy.observeTicks}/2。`,'evt');
+  showMXYNotice('观 势 入 局',`两军对峙尽收眼底 · ${G.mxy.observeTicks}/2`);
+}
+function mxyFactionStrength(fac){
+  const core=G.units.filter(u=>u.hp>0&&u.faction===fac&&['lord','brave','sage','guard'].includes(u.type));
+  const hp=core.reduce((a,u)=>a+Math.max(0,u.hp),0);
+  const levels=core.reduce((a,u)=>a+(u.level||1),0);
+  return hp+core.length*30+levels*8+(G.gold[fac]||0)*0.25;
+}
+function mxyStrongestFaction(){
+  const facs=MAJOR_FACTIONS.filter(f=>G.units.some(u=>u.hp>0&&u.faction===f&&['lord','brave','sage','guard'].includes(u.type)));
+  return facs.sort((a,b)=>mxyFactionStrength(b)-mxyFactionStrength(a))[0]||null;
+}
+function mxyBalanceStatus(m){
+  const target=mxyStrongestFaction();const rep=target?mxyRepresentative(target):null;const b=G.mxy.balance||{};
+  if(currentMXYEvent()?.key!=='balance')return {ok:false,target,rep,reason:'尚未进入制衡阶段'};
+  if(b.active)return {ok:false,target:b.target,rep:mxyRepresentative(b.target),reason:'制衡令已经生效'};
+  if((G.mxy.balanceCd||0)>0)return {ok:false,target,rep,reason:`制衡令冷却 ${G.mxy.balanceCd}`};
+  if(!m||m.energy<MXY_BALANCE_SKILL.cost)return {ok:false,target,rep,reason:'能量不足'};
+  if(!rep)return {ok:false,target,rep,reason:'当前无可制衡代表'};
+  if(cheb(m,rep)>MXY_BALANCE_SKILL.range)return {ok:false,target,rep,reason:`需接近当前强权代表 ${MXY_BALANCE_SKILL.range} 格内`};
+  return {ok:true,target,rep,reason:'可以施令'};
+}
+function activateMXYBalance(m,fromPlayer=false){
+  const st=mxyBalanceStatus(m);
+  if(!st.ok){if(fromPlayer)log(`♛ 制衡令未能发动：${st.reason}`,'sys');return false;}
+  m.energy-=MXY_BALANCE_SKILL.cost;G.mxy.balanceCd=MXY_BALANCE_SKILL.cd;
+  G.mxy.balance={active:true,target:st.target,damage:0,expiresRound:G.round+MXY_BALANCE_SKILL.duration};
+  G.mxy.lastText=`制衡令已指向 ${factionName(st.target)}：等待其他势力形成压制`;
+  log(`♛ <b>MXY · 制衡令</b> 指向 <b style="color:${factionColor(st.target)}">${factionName(st.target)}</b>。其他主要势力将更倾向压制该强权。`,'skill');
+  showMXYNotice('制 衡 令',`${factionName(st.target)} 成为制衡目标 · 需承受 ${MXY_BALANCE_SKILL.requiredDamage} 点他方伤害`);
+  renderUnits();renderHUD();renderUnitInfo();return true;
+}
+function updateMXYBalanceExpiry(){
+  const b=G.mxy&&G.mxy.balance;if(!b||!b.active)return;
+  if(currentMXYEvent()?.key!=='balance'){b.active=false;return;}
+  if(G.round>b.expiresRound){
+    log(`♛ 制衡令失效：${factionName(b.target)} 未在期限内受到足够他方压力，需要重新判断局势。`,'sys');
+    G.mxy.balance={active:false,target:null,damage:0,expiresRound:0};
+    G.mxy.lastText='制衡未成，可重新接近当前最强势力代表施令';
+  }
+}
+function recordMXYBalanceDamage(target,sourceFaction,damage){
+  const b=G.mxy&&G.mxy.balance;
+  if(!b||!b.active||currentMXYEvent()?.key!=='balance'||!target||target.faction!==b.target)return;
+  if(!MAJOR_FACTIONS.includes(sourceFaction)||sourceFaction===b.target||damage<=0)return;
+  b.damage=(b.damage||0)+damage;
+  G.mxy.lastText=`制衡 ${factionName(b.target)}：${Math.min(MXY_BALANCE_SKILL.requiredDamage,b.damage)}/${MXY_BALANCE_SKILL.requiredDamage}`;
+  if(b.damage>=MXY_BALANCE_SKILL.requiredDamage){
+    const ev=currentMXYEvent();
+    G.mxy.lastBalanceTarget=b.target;
+    b.active=false;
+    finishMXYEvent(ev,`${factionName(b.target)} 在制衡令下承受 ${b.damage} 点他方伤害`);
+  }
+}
+function recordMXYMeet(m){
+  if(!m||!currentMXYEvent()||currentMXYEvent().key!=='meet')return;
+  MAJOR_FACTIONS.forEach(f=>{
+    if(G.mxy.met[f])return;
+    const st=mxyMeetStatus(m,f);
+    if(!st.ok)return;
+    G.mxy.met[f]=true;
+    const role=st.rep.type==='lord'?'统帅':'继任代表';
+    log(`♛ <b>MXY · 领主</b> 与 <b style="color:${factionColor(f)}">${factionName(f)} · ${role}</b> 完成会盟。`,'evt');
+    showMXYNotice('会 盟 达 成',`MXY 与 ${factionName(f)} 完成外交接触`);
+  });
+}
+function activateMXYEnvoy(m,fromPlayer=false){
+  const sk=SKILLS.mxy_lord;
+  if(!m||!sk||currentMXYEvent()?.key!=='meet'||m.skillCd>0||m.energy<sk.cost||m.envoy)return false;
+  m.energy-=sk.cost;m.skillCd=sk.cd+1;m.envoy=true;
+  G.mxy.lastText='遣使护行中：降低受击与追杀风险，但无法主动攻击';
+  log(`✉ <b>MXY · 领主</b> 发动 <b>遣使</b>：进入外交护行状态，受到伤害降低，三方降低追击优先级。`,'skill');
+  if(fromPlayer)showMXYNotice('遣 使 护 行','外交护行已生效；靠近统帅或继任代表完成会盟');
+  return true;
+}
+
+function mxyVerdictStatus(m){
+  const aliveMaj=MAJOR_FACTIONS.filter(f=>G.units.some(u=>u.hp>0&&u.faction===f));
+  if(currentMXYEvent()?.key!=='verdict')return {ok:false,reason:'尚未进入裁局阶段',fac:null,rep:null};
+  if(aliveMaj.length<2)return {ok:false,reason:'天下已只剩一方，领主失去制衡空间',fac:null,rep:null};
+  const preferred=aliveMaj.filter(f=>f!==G.mxy.lastBalanceTarget);
+  const pool=(preferred.length?preferred:aliveMaj).map(f=>({fac:f,rep:mxyRepresentative(f)})).filter(x=>x.rep);
+  if(!pool.length)return {ok:false,reason:'当前无可裁局代表',fac:null,rep:null};
+  const adjacent=pool.filter(x=>cheb(x.rep,m)<=1).sort((a,b)=>dist(m,a.rep)-dist(m,b.rep));
+  if(adjacent.length)return {ok:true,fac:adjacent[0].fac,rep:adjacent[0].rep,reason:'已抵达裁局代表身边'};
+  const nearest=pool.sort((a,b)=>dist(m,a.rep)-dist(m,b.rep))[0];
+  return {ok:false,fac:nearest.fac,rep:nearest.rep,reason:`需接近 ${factionName(nearest.fac)} 的代表完成最终裁局`};
+}
+function finishMXYEvent(ev,detail){
+  if(!ev||ev.done||G.over)return;ev.done=true;G.mxy.index++;G.mxy.lastText=`${ev.name}完成${detail?' · '+detail:''}`;
+  log(`♛ 【领主事件】<b>${ev.name}</b> 完成${detail?' · '+detail:''}`,'evt');showMXYNotice('事 件 达 成',`${ev.name} · ${detail||'领主事件推进'}`);
+  adjustZYTrust('MXY',3,`完成权谋节点「${ev.name}」`,true);
+  if(G.mxy.index>=G.mxy.events.length){G.mxy.won=true;G.mxy.lastText='四段权谋链全部完成，领主取得特殊胜利';G.over=true;G.busy=false;renderUnits();renderHUD();setTimeout(()=>endGame('mxy-victory','MXY'),650);}
+}
+function evaluateMXYEvent(m){
+  if(!m||m.hp<=0||G.over)return;const ev=currentMXYEvent();if(!ev)return;
+  if(ev.key==='meet'){recordMXYMeet(m);if(Object.keys(G.mxy.met).length>=2)finishMXYEvent(ev,'已与两方势力完成合纵');}
+  else if(ev.key==='observe'){recordMXYObserve(m);if((G.mxy.observeTicks||0)>=2)finishMXYEvent(ev,'已两次置身两军对峙，完成观势');}
+  else if(ev.key==='balance'){updateMXYBalanceExpiry();}
+  else if(ev.key==='verdict'){
+    const st=mxyVerdictStatus(m);
+    if(st.ok)finishMXYEvent(ev,`与 ${factionName(st.fac)} 代表完成最终裁局`);
+  }
+}
+function mxyTarget(m,ev){
+  const cells=[];
+  if(ev&&ev.key==='meet'){const reps=MAJOR_FACTIONS.filter(f=>!G.mxy.met[f]).map(f=>mxyRepresentative(f)).filter(Boolean);if(reps.length){const t=reps.sort((a,b)=>dist(m,a)-dist(m,b))[0];return [t.x,t.y];}}
+  if(ev&&ev.key==='observe'){
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+      if(!isPassableTile(x,y)||unitAt(x,y))continue;
+      const fs=MAJOR_FACTIONS.filter(f=>G.units.some(u=>u.hp>0&&u.faction===f&&['lord','brave','sage','guard'].includes(u.type)&&cheb(u,{x,y})<=2));
+      if(fs.length>=2)cells.push([x,y]);
+    }
+    if(cells.length)return cells.sort((a,b)=>Math.abs(a[0]-m.x)+Math.abs(a[1]-m.y)-Math.abs(b[0]-m.x)-Math.abs(b[1]-m.y))[0];
+  }
+  if(ev&&ev.key==='balance'){const t=mxyStrongestFaction();const rep=t?mxyRepresentative(t):null;if(rep)return [rep.x,rep.y];}
+  if(ev&&ev.key==='verdict'){const st=mxyVerdictStatus(m);if(st.rep)return [st.rep.x,st.rep.y];}
+  return [Math.floor(COLS/2),Math.floor(ROWS/2)];
+}
