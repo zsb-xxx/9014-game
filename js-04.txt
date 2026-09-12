@@ -1,0 +1,301 @@
+ave','sage','guard'].includes(u.type)&&Math.max(Math.abs(u.x-x),Math.abs(u.y-y))<=2));
+      if(fs.length>=2)cells.push([x,y]);
+    }
+    if(cells.length)return cells.sort((a,b)=>(Math.abs(a[0]-m.x)+Math.abs(a[1]-m.y))-(Math.abs(b[0]-m.x)+Math.abs(b[1]-m.y)))[0];
+  }
+  if(ev&&ev.key==='balance'){const target=mxyStrongestFaction(),rep=target?mxyRepresentative(target):null;if(rep)return [rep.x,rep.y];}
+  if(ev&&ev.key==='verdict'){const st=mxyVerdictStatus(m);if(st.rep)return [st.rep.x,st.rep.y];}
+  const cx=G.shrink.active?(G.shrink.colMin+G.shrink.colMax)/2:(COLS-1)/2,cy=G.shrink.active?(G.shrink.rowMin+G.shrink.rowMax)/2:(ROWS-1)/2;return [Math.round(cx),Math.round(cy)];
+}
+function mxyTurn(onDone){
+  const m=mxyAlive();if(!m||G.mxy.won||G.over){onDone&&onDone();return;}G.current='MXY';m.moved=false;m.acted=false;m.buff=1;m.movBonus=0;m.slow=false;
+  if(m.envoy)m.envoy=false;if(m.skillCd>0)m.skillCd--;if((G.mxy.balanceCd||0)>0)G.mxy.balanceCd--;m.energy=Math.min(100,m.energy+25);updateMXYBalanceExpiry();
+  if(m.hp<m.maxHp){const heal=Math.min(12,m.maxHp-m.hp);m.hp+=heal;float(m,heal,'heal');healFX(m.x,m.y);log(`♛ <b>独行之主</b>：MXY 回复 ${heal} 兵力`,'skill');}
+  const ev=currentMXYEvent();evaluateMXYEvent(m);if(G.over){onDone&&onDone();return;}
+  if(ev&&ev.key==='meet')activateMXYEnvoy(m,false);
+  if(ev&&ev.key==='balance'&&!G.mxy.balance.active&&mxyBalanceStatus(m).ok)activateMXYBalance(m,false);
+  const evNow=currentMXYEvent(),target=mxyTarget(m,evNow),moves=computeMoves(m);let best=[m.x,m.y],bestScore=Infinity;
+  for(const [x,y] of [[m.x,m.y],...moves]){if(G.shrink.active&&!inSafeZone(x,y))continue;let score=Math.abs(x-target[0])+Math.abs(y-target[1]);score-=terrainAt(x,y).def*1.5;if(MAP[y][x]===5)score-=.6;const near=MAJOR_FACTIONS.reduce((n,f)=>n+G.units.filter(u=>u.hp>0&&u.faction===f&&Math.max(Math.abs(u.x-x),Math.abs(u.y-y))<=1).length,0);score+=(evNow&&evNow.key==='meet')?-near*2.5:near*2.2;if(score<bestScore){bestScore=score;best=[x,y];}}
+  if(best[0]!==m.x||best[1]!==m.y){m.x=best[0];m.y=best[1];m.moved=true;}
+  if(currentMXYEvent()?.key==='balance'&&!G.mxy.balance.active&&mxyBalanceStatus(m).ok)activateMXYBalance(m,false);
+  m.acted=true;recordMXYMeet(m);evaluateMXYEvent(m);
+  if(!G.over){const cur=currentMXYEvent();G.mxy.lastText=cur?`正在推进：${cur.name}`:'事件链已完成';log(`♛ MXY · 领主行动：${cur?`推进「${cur.name}」`:'事件链完成'}`,'evt');}
+  renderUnits();renderHUD();refreshTiles();setTimeout(()=>{checkWin();onDone&&onDone();},620);
+}
+function checkMXYDefeat(){
+  if(!G.mxy||!G.mxy.spawned||G.mxy.defeated||G.mxy.won)return;if(G.units.some(u=>u.isMXY&&u.hp>0))return;
+  G.mxy.defeated=true;G.mxy.lastText='领主已被击败，事件链终止';log(`♛ <b>MXY · 领主</b> 被击败，本局领主事件链终止。`,'kill');showMXYNotice('领 主 退 场',G.player==='MXY'?'你的领主被击败，事件链失败':'MXY 被击败，事件胜利威胁解除');
+}
+
+
+/* ==================== ZY · 量子隐士 NPC逻辑 ==================== */
+let zyNpcMarker=null;
+function clampZYTrust(v){return Math.max(-30,Math.min(100,Math.round(v)));}
+function zyTrust(fac){return G.zyNPC&&G.zyNPC.trust?G.zyNPC.trust[fac]||0:0;}
+function adjustZYTrust(fac,delta,reason,quiet=false){
+  if(!G.zyNPC||!G.zyNPC.trust||G.zyNPC.trust[fac]===undefined||!delta)return;
+  const before=G.zyNPC.trust[fac];const after=clampZYTrust(before+delta);G.zyNPC.trust[fac]=after;
+  if(reason)G.zyNPC.lastText=`${factionName(fac)}：${reason}`;
+  if(!quiet&&(fac===G.player||Math.abs(delta)>=5))log(`◇ ZY 对 <b>${factionName(fac)}</b> 的态度 ${delta>0?'+':''}${delta}（${zyAttitudeName(after)}）${reason?' · '+reason:''}`,'evt');
+}
+function snapshotZYStats(fac){
+  if(!G.zyNPC.lastStats)G.zyNPC.lastStats={};
+  G.zyNPC.lastStats[fac]={damage:(G.stats.damageDealt?.[fac]||0),kills:(G.stats.kills?.[fac]||0),boss:(G.stats.bossDamage?.[fac]||0)};
+}
+function updateZYObservation(fac){
+  if(!G.zyNPC||!MAJOR_FACTIONS.includes(fac))return;
+  const prev=G.zyNPC.lastStats?.[fac]||{damage:0,kills:0,boss:0};
+  const cur={damage:(G.stats.damageDealt?.[fac]||0),kills:(G.stats.kills?.[fac]||0),boss:(G.stats.bossDamage?.[fac]||0)};
+  let delta=0;const reasons=[];
+  const dd=cur.damage-prev.damage, db=cur.boss-prev.boss, dk=cur.kills-prev.kills;
+  if(db>0){delta+=4;reasons.push('参与共同威胁处置');}
+  if(dd>=90){delta+=2;reasons.push('展现稳定执行力');}
+  if(dk>0){delta+=1;}
+  const hub=G.units.filter(u=>u.hp>0&&u.faction===fac&&PRINCE_CORE_TYPES.has(u.type)&&onHub(u.x,u.y)).length;
+  const strongest=MAJOR_FACTIONS.slice().sort((a,b)=>mxyFactionStrength(b)-mxyFactionStrength(a))[0];
+  if(hub>=3&&strongest===fac){delta-=2;reasons.push('中枢力量过度集中');}
+  if(delta)adjustZYTrust(fac,delta,reasons.join('、'),true);
+  G.zyNPC.lastStats[fac]=cur;
+}
+function zySupportCooldown(fac){
+  const last=G.zyNPC?.lastSupportRound?.[fac]??-99;
+  return Math.max(0,ZY_SUPPORT_COOLDOWN-(G.round-last));
+}
+function zyCanRequest(fac){return zyTrust(fac)>=ZY_SUPPORT_MIN_TRUST&&zySupportCooldown(fac)<=0&&!G.over;}
+function requestZYSupport(fac,manual=true){
+  if(!G.zyNPC||!FACTIONS[fac])return false;
+  const trust=zyTrust(fac),cd=zySupportCooldown(fac);
+  if(trust<ZY_SUPPORT_MIN_TRUST){if(manual)log(`◇ ZY 拒绝支援：当前仍在观察 ${factionName(fac)}。`,'sys');return false;}
+  if(cd>0){if(manual)log(`◇ ZY 离线通道仍在冷却，还需 ${cd} 个完整回合。`,'sys');return false;}
+  const units=G.units.filter(u=>u.hp>0&&u.faction===fac&&!u.isBoss&&!u.isMinion);
+  if(!units.length)return false;
+  let name='',desc='',cost=4;
+  if(trust>=70){
+    name='江湖派协防';cost=12;
+    units.filter(u=>u.isMXY||PRINCE_CORE_TYPES.has(u.type)).forEach(u=>{u.shield=(u.shield||0)+30;u.energy=Math.min(100,(u.energy||0)+20);});
+    desc='核心单位获得 30 护盾与 20 能量';
+  }else if(trust>=45){
+    name='量子通道';cost=8;
+    units.forEach(u=>u.energy=Math.min(100,(u.energy||0)+15));
+    const hand=G.hand?.[fac];if(hand&&hand.length<4){const tp=CARDS.find(c=>c.key==='tp');if(tp)hand.push(tp);}
+    desc='全体 +15 能量，并获得一张传送符（手牌有空位时）';
+  }else{
+    name='离线备份';cost=4;
+    const u=units.slice().sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];const heal=Math.min(40,u.maxHp-u.hp);u.hp+=heal;u.energy=Math.min(100,(u.energy||0)+10);if(heal>0){float(u,heal,'heal');healFX(u.x,u.y);}
+    desc=`${u.typeName} 回复 ${heal} 兵力并获得 10 能量`;
+  }
+  G.zyNPC.lastSupportRound[fac]=G.round;adjustZYTrust(fac,-cost,`调用「${name}」`,true);
+  G.zyNPC.lastText=`${factionName(fac)} 获得「${name}」：${desc}`;
+  log(`◇ <b>ZY · ${name}</b>：${factionName(fac)} ${desc}。ZY 仍保持中立。`,'ally');
+  renderUnits();renderHUD();renderCards();renderZYInfo();return true;
+}
+function maybeAIRequestZY(fac){
+  if(fac===G.player||!MAJOR_FACTIONS.includes(fac)||!zyCanRequest(fac))return;
+  const hurt=G.units.some(u=>u.hp>0&&u.faction===fac&&u.hp/u.maxHp<0.55);
+  if((hurt&&Math.random()<0.35)||zyTrust(fac)>=70&&Math.random()<0.18)requestZYSupport(fac,false);
+}
+function renderZYMarker(){
+  if(!G.zyNPC||!unitsEl)return;
+  if(!zyNpcMarker){zyNpcMarker=document.createElement('div');zyNpcMarker.className='zy-npc-marker';zyNpcMarker.innerHTML='<div class="zy-npc-core">ZY</div>';unitsEl.appendChild(zyNpcMarker);}
+  const tile=tileSize();zyNpcMarker.style.left=(G.zyNPC.x*tile)+'px';zyNpcMarker.style.top=(G.zyNPC.y*tile)+'px';
+}
+function renderZYInfo(){
+  if(!zyNpcInfo||!G.zyNPC)return;
+  const fac=G.player,v=zyTrust(fac),pct=Math.max(0,Math.min(100,v));const cd=zySupportCooldown(fac);
+  let tier=v>=70?'江湖派协防':v>=45?'量子通道':v>=20?'离线备份':'尚不提供支援';
+  zyNpcInfo.innerHTML=`<div class="zy-relation"><b>${factionName(fac)} · ${zyAttitudeName(v)}</b><span>${v} / 100</span></div><div class="zy-trustbar"><i style="width:${pct}%"></i></div><div class="zy-principle">原则：不占阵营、不接受强占；更愿意支援能维持科研底线、处理共同威胁且不过度垄断中枢的一方。</div><div class="zy-support-state"><b>当前可申请：</b>${tier}${cd>0?` · 通道冷却 ${cd}`:''}<br><b>最近观察：</b>${G.zyNPC.lastText||'保持中立观察'}</div>`;
+  if(zyRequestBtn){const can=G.current===G.player&&!G.busy&&zyCanRequest(fac);zyRequestBtn.disabled=!can;zyRequestBtn.textContent=v<20?'尚 未 获 得 ZY 认 可':cd>0?`离 线 通 道 冷 却 ${cd}`:'请 求 技 术 支 援';}
+}
+
+/* ==================== 身份差异 / 多阶段胜利 ==================== */
+function isPrince(f){return f==='LLY'||f==='JYM';}
+const PRINCE_CORE_TYPES=new Set(['lord','brave','sage','guard']);
+const LLY_HOLD_TURNS=3;
+const LLY_TREASURY_GOLD=100;
+const LLY_ZY_UNITS=2;
+const JYM_HOLD_TURNS=2;
+const JYM_ZY_UNITS=1;
+const STRATEGIC_REGIONS=[
+  {key:'west',name:'西境',x0:0,x1:4},
+  {key:'mid',name:'中原',x0:5,x1:9},
+  {key:'east',name:'东境',x0:10,x1:COLS-1}
+];
+function mapHasTown(){return MAP.some(row=>row.some(v=>v===4));}
+function strategicRegionAt(x){return STRATEGIC_REGIONS.find(r=>x>=r.x0&&x<=r.x1)||STRATEGIC_REGIONS[1];}
+function regionCoreCount(fac,region){return G.units.filter(u=>u.hp>0&&u.faction===fac&&PRINCE_CORE_TYPES.has(u.type)&&u.x>=region.x0&&u.x<=region.x1).length;}
+function jymControlledRegions(){
+  return STRATEGIC_REGIONS.filter(r=>{
+    const own=regionCoreCount('JYM',r);if(own<=0)return false;
+    const rivals=['GYC','LLY'].map(f=>regionCoreCount(f,r));
+    return own>Math.max(...rivals);
+  });
+}
+function updateRoleProgress(fac){
+  if(G.over||G.bossActive)return;
+  if(fac==='LLY'){
+    const townExists=mapHasTown();
+    const hasTown=Object.values(G.towns||{}).some(v=>v==='LLY');
+    const treasury=(G.gold.LLY||0)>=LLY_TREASURY_GOLD;
+    const zyCore=G.units.filter(u=>u.hp>0&&u.faction==='LLY'&&PRINCE_CORE_TYPES.has(u.type)&&onZY(u.x,u.y)).length;
+    const qualified=treasury&&(townExists?hasTown:true)&&zyCore>=LLY_ZY_UNITS;
+    if(qualified&&!G.roleStage.LLY){G.roleStage.LLY=true;log(`♜ <b>LLY 取得开源网络资格</b>：国库与中枢条件俱足，开始守住开源网络窗口。`,'sys');}
+    if(!qualified&&G.roleStage.LLY&&G.roleProgress.LLY>0)log(`♜ LLY 开源网络条件被打破，称霸进度清零。`,'sys');
+    if(!qualified)G.roleStage.LLY=false;
+    G.roleProgress.LLY=qualified?(G.roleProgress.LLY||0)+1:0;
+    if(G.roleProgress.LLY>0){const route=townExists?'节点在握':'无节点之局';log(`♜ LLY 开源成势进度：${G.roleProgress.LLY}/${LLY_HOLD_TURNS}（${route} · 国库 ${G.gold.LLY}/${LLY_TREASURY_GOLD} · 中枢核心 ${zyCore}/${LLY_ZY_UNITS}）`,'sys');}
+    if(G.roleProgress.LLY>=LLY_HOLD_TURNS){G.roleVictory={faction:'LLY',type:'lly-hegemony',route:townExists?'town':'treasury'};checkWin();}
+    return;
+  }
+  if(fac==='JYM'){
+    const controlled=jymControlledRegions();
+    const zyCore=G.units.filter(u=>u.hp>0&&u.faction==='JYM'&&PRINCE_CORE_TYPES.has(u.type)&&onZY(u.x,u.y)).length;
+    const qualified=controlled.length>=2&&zyCore>=JYM_ZY_UNITS;
+    if(qualified&&!G.roleStage.JYM){G.roleStage.JYM=true;log(`✎ <b>JYM 形成控图态势</b>：已掌控两大战略区并维持中枢影响，进入织网窗口。`,'sys');}
+    if(!qualified&&G.roleStage.JYM&&G.roleProgress.JYM>0)log(`✎ JYM 暗网控制链被打断，织网进度清零。`,'sys');
+    if(!qualified)G.roleStage.JYM=false;
+    G.roleProgress.JYM=qualified?(G.roleProgress.JYM||0)+1:0;
+    if(G.roleProgress.JYM>0)log(`✎ JYM 织网进度：${G.roleProgress.JYM}/${JYM_HOLD_TURNS}（控制 ${controlled.map(r=>r.name).join(' / ')} · 中枢核心 ${zyCore}/${JYM_ZY_UNITS}）`,'sys');
+    if(G.roleProgress.JYM>=JYM_HOLD_TURNS){G.roleVictory={faction:'JYM',type:'jym-control',regions:controlled.map(r=>r.key)};checkWin();}
+  }
+}
+function recordRebelHead(target,killerFaction){
+  if(!target||killerFaction!=='GYC'||target.type!=='lord')return;
+  if(target.faction!=='LLY'&&target.faction!=='JYM')return;
+  if(!G.rebelHeads)G.rebelHeads={LLY:false,JYM:false};
+  if(G.rebelHeads[target.faction])return;
+  G.rebelHeads[target.faction]=true;
+  const n=(G.rebelHeads.LLY?1:0)+(G.rebelHeads.JYM?1:0);
+  log(`⚔ <b>收网节点</b>：GYC 亲自击破 ${factionName(target.faction)} 统帅（${n}/2）`,'kill');
+  if(n>=2&&!G.rebelEndgame.active&&!G.rebelEndgame.failed){
+    const lordAlive=G.units.some(u=>u.hp>0&&u.faction==='GYC'&&u.type==='lord');
+    if(!lordAlive){G.rebelEndgame.failed=true;log(`⚔ 两方核心虽已击破，但 GYC 统帅已亡，无法完成「收网时刻」终局。`,'sys');return;}
+    G.rebelEndgame={active:true,readyRound:G.round+1,failed:false};
+    log(`⚔ <b>收网时刻</b>：两方核心负责人皆已被击破。若 GYC 统帅存活至第 ${G.rebelEndgame.readyRound} 回合，GYC 完成收网。`,'kill');
+  }
+}
+function updateRebelEndgame(){
+  const e=G.rebelEndgame;if(!e||!e.active||e.failed)return;
+  const lordAlive=G.units.some(u=>u.hp>0&&u.faction==='GYC'&&u.type==='lord');
+  if(!lordAlive){e.active=false;e.failed=true;log(`⚔ GYC 统帅在终局窗口中阵亡，「收网时刻」被阻止。`,'kill');return;}
+  if(G.round>=e.readyRound){G.roleVictory={faction:'GYC',type:'rebel'};e.active=false;checkWin();}
+}
+function rebelVictoryReady(){return !!(G.roleVictory&&G.roleVictory.faction==='GYC'&&G.roleVictory.type==='rebel');}
+
+/* ==================== 数值计算 ==================== */
+function calcAtk(u){
+  let atk=(u.isBoss?bossEffectiveAtk(u):u.atk)*(u.buff||1);
+  const f=FACTIONS[u.faction];
+  if(f&&f.skill.type==='rage'&&u.hp/u.maxHp<0.5)atk*=1.4;
+  if(u.rageBuff)atk*=1.5;
+  atk*=terrainAt(u.x,u.y).atkMod;
+  if(u.flagBuff)atk*=1.2;
+  if(G.disaster){
+    if(G.disaster.key==='bloodmoon')atk*=1.3;
+    if(G.disaster.key==='zy-surge'&&onZY(u.x,u.y))atk*=1.2;
+  }
+  return Math.round(atk);
+}
+function calcRange(u){
+  const t=TYPES[u.type];if(!t)return 1;
+  let r=t.range;
+  const f=FACTIONS[u.faction];
+  if(f&&f.skill.type==='tactics'&&u.type==='sage')r+=1;
+  r+=(terrainAt(u.x,u.y).rngMod||0);
+  if(G.disaster&&G.disaster.key==='storm')r-=1;
+  return Math.max(1,r);
+}
+function calcMov(u){
+  let mov=u.mov+(u.movBonus||0);
+  const f=FACTIONS[u.faction];
+  if(f&&f.skill.type==='tactics')mov+=1;
+  if(G.disaster&&G.disaster.key==='blizzard'&&!onZY(u.x,u.y))mov-=1;
+  if(u.slow)mov-=1;
+  return Math.max(1,mov);
+}
+function isRaging(u){
+  const f=FACTIONS[u.faction];
+  return f&&f.skill.type==='rage'&&u.hp>0&&u.hp/u.maxHp<0.5;
+}
+function canUseSkill(u){
+  const sk=SKILLS[u.type];
+  if(!sk)return false;
+  if(u.type==='mxy_lord'&&currentMXYEvent()?.key!=='meet')return false;
+  return u.skillCd===0&&u.energy>=sk.cost&&!u.acted&&u.hp>0;
+}
+
+function inPattern(u,x,y){
+  if(x===u.x&&y===u.y)return false;
+  const dx=Math.abs(x-u.x),dy=Math.abs(y-u.y);
+  const man=dx+dy,che=Math.max(dx,dy);
+  const t=TYPES[u.type];if(!t)return false;
+  const r=calcRange(u);
+  switch(t.pattern){
+    case 'ring':return che===1;
+    case 'cross':return man===1;
+    case 'diagonal':return dx===1&&dy===1;
+    case 'bossring':return che<=r&&che>0;
+    case 'line':
+      if(dx!==0&&dy!==0)return false;
+      if(man<1||man>r)return false;
+      return hasLOS(u.x,u.y,x,y);
+    default:return man<=r;
+  }
+}
+function hasLOS(x0,y0,x1,y1){
+  if(x0!==x1&&y0!==y1)return false;
+  const dx=Math.sign(x1-x0),dy=Math.sign(y1-y0);
+  let cx=x0+dx,cy=y0+dy;
+  while(cx!==x1||cy!==y1){
+    if(!isPassableTile(cx,cy))return false;
+    cx+=dx;cy+=dy;
+  }
+  return true;
+}
+function computeAtk(u){
+  const res=[];
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(inPattern(u,x,y))res.push([x,y]);
+  return res;
+}
+
+/* ==================== 初始化 ==================== */
+function buildTiles(){
+  tilesEl.innerHTML='';
+  // 启动页阶段若地图尚未生成，使用安全的全平原占位图，避免初始化中断
+  if(!Array.isArray(MAP)||MAP.length!==ROWS||MAP.some(row=>!Array.isArray(row)||row.length!==COLS)){
+    MAP=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  }
+  for(let y=0;y<ROWS;y++){
+    for(let x=0;x<COLS;x++){
+      const d=document.createElement('div');
+      d.className='tile';
+      const t=MAP[y][x];
+      d.classList.add(['plain','forest','mountain','river','town','zy','hill','zy-lab'][t]||'plain');
+      d.dataset.x=x;d.dataset.y=y;
+      tilesEl.appendChild(d);
+    }
+  }
+  applyDisasterTiles();
+  applyShrinkTiles();
+}
+function rebuildTiles(){buildTiles();}
+function applyShrinkTiles(){
+  tilesEl.querySelectorAll('.tile').forEach(el=>{
+    el.classList.remove('out-zone','zone-edge');
+  });
+  if(!G.shrink.active) return;
+  tilesEl.querySelectorAll('.tile').forEach(el=>{
+    const x=parseInt(el.dataset.x),y=parseInt(el.dataset.y);
+    if(MAP[y][x]===7)return;
+    if(!inSafeZone(x,y)) el.classList.add('out-zone');
+    else if(isZoneEdge(x,y)) el.classList.add('zone-edge');
+  });
+}
+function applyDisasterTiles(){
+  tilesEl.querySelectorAll('.tile').forEach(el=>{
+    el.classList.remove('di-fire','di-flood','di-blizzard','di-plague','di-zy-surge','di-storm');
+  });
+  if(!G.disaster)return;
+  const key=G.disaster.key;
+  tilesEl.querySelectorAll('.tile').forEach(el=>{
+    const x=parseInt(el.dataset.x),y=parseInt(el.dataset.y);
+    if(key==='fire'&&MAP[y][x]===1)el.classList.add(
