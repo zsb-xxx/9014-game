@@ -1,0 +1,338 @@
+
+/* ==================== 常量 ==================== */
+const COLS=15,ROWS=11;
+const DIRS=[[0,1],[0,-1],[1,0],[-1,0]];
+const HUB_X0=Math.floor((COLS-2)/2), HUB_Y0=Math.floor((ROWS-2)/2);
+function hubCells(){return [[HUB_X0,HUB_Y0],[HUB_X0+1,HUB_Y0],[HUB_X0,HUB_Y0+1],[HUB_X0+1,HUB_Y0+1]];}
+// 兼容旧内部逻辑：原 ZY 中央格现定义为 9013 中枢算力池。
+const ZY_X0=HUB_X0, ZY_Y0=HUB_Y0;
+function zyCells(){return hubCells();}
+
+const TERRAIN={
+  0:{name:'平原',def:1.0,eva:0,movCost:1,atkMod:1.0,heal:0,gold:0,rngMod:0},
+  1:{name:'森林',def:1.0,eva:0.20,movCost:2,atkMod:1.0,heal:0,gold:0,rngMod:0},
+  2:{name:'山地',def:1.3,eva:0,movCost:99,atkMod:1.0,heal:0,gold:0,rngMod:-1},
+  3:{name:'河流',def:0.9,eva:0,movCost:2,atkMod:1.0,heal:0,gold:0,rngMod:-1},
+  4:{name:'算力节点',def:1.1,eva:0,movCost:1,atkMod:1.0,heal:10,gold:15,rngMod:0},
+  5:{name:'9013中枢算力池',def:1.2,eva:0,movCost:1,atkMod:1.25,heal:15,gold:0,rngMod:0},
+  6:{name:'丘陵',def:1.12,eva:0.05,movCost:2,atkMod:1.05,heal:0,gold:0,rngMod:1},
+  7:{name:'ZY离线实验室',def:1.25,eva:0,movCost:99,atkMod:1.0,heal:0,gold:0,rngMod:0}
+};
+
+const FACTIONS={
+  GYC:{key:'GYC',name:'GYC',label:'破 局 者',color:'#e74c3c',motto:'藏锋于乱局，收网于终局',
+    skill:{name:'藏锋破局',icon:'◈',desc:'兵力低于 50% 时，攻击力 +40%。以低调潜伏换取终局反击窗口。',type:'rage'}},
+  LLY:{key:'LLY',name:'LLY',label:'碧 游 村',color:'#3498db',motto:'技术开源，不问门第',
+    skill:{name:'开源共振',icon:'⛨',desc:'每回合开始，己方全体回复 12 点兵力。通过资源、算力节点与中枢影响力建立稳定科研网络。',type:'regen'}},
+  JYM:{key:'JYM',name:'JYM',label:'暗 网 派',color:'#2ecc71',motto:'藏于灰域，逐势而动',
+    skill:{name:'灰域游击',icon:'✎',desc:'谋士射程 +1，全体移动力 +1。依靠跨区渗透与信息差织成暗网优势。',type:'tactics'}},
+  MXY:{key:'MXY',name:'MXY',label:'领 主',color:'#f0d879',motto:'不争一城一地，只争天下大势',
+    skill:{name:'纵横制衡',icon:'♛',desc:'不占城池，以会盟、观势、制衡与最终裁局完成权谋胜利；拥有「遣使」与「制衡令」两种专属谋略。',type:'event'}}
+};
+
+const TYPES={
+  lord:{name:'统帅',short:'统',icon:'♔',hp:170,atk:24,mov:3,pattern:'ring',range:1,counter:'guard',
+    desc:'攻击周围 8 格 · 光环：相邻友军每回合回血 8'},
+  brave:{name:'猛将',short:'猛',icon:'⚔',hp:130,atk:44,mov:4,pattern:'cross',range:1,counter:'lord',
+    desc:'攻击 4 个正交方向 · 高移动 · 高伤害'},
+  sage:{name:'谋士',short:'谋',icon:'✎',hp:85,atk:34,mov:3,pattern:'line',range:3,counter:'brave',
+    desc:'沿直线攻击 1~3 格 · 需视线 · 远程压制'},
+  guard:{name:'精兵',short:'兵',icon:'⛨',hp:120,atk:28,mov:4,pattern:'diagonal',range:1,counter:'sage',
+    desc:'攻击 4 个斜角方向 · 坚韧：受到伤害 -15%'},
+  minion:{name:'傀儡',short:'傀',icon:'▣',hp:60,atk:25,mov:3,pattern:'cross',range:1,counter:'',
+    desc:'天灾傀儡 · 微弱但烦人'},
+  clinician:{name:'住院医师',short:'医',icon:'✚',hp:95,atk:20,mov:4,pattern:'ring',range:1,counter:'',
+    desc:'临床伙伴 · 每回合自动救治伤势最重的两名友军'},
+  nurse:{name:'急诊护士',short:'护',icon:'✚',hp:110,atk:22,mov:4,pattern:'cross',range:1,counter:'',
+    desc:'临床伙伴 · 每回合为伤势最重的友军补充护盾'},
+  chief:{name:'临床主任',short:'主',icon:'✚',hp:125,atk:30,mov:3,pattern:'line',range:2,counter:'',
+    desc:'临床伙伴 · 提升团队能量恢复与攻击效率'},
+  mxy_lord:{name:'领主',short:'领',icon:'♛',hp:320,atk:38,mov:5,pattern:'ring',range:1,counter:'',
+    desc:'特殊棋子 · 单核权谋势力；不占城池，以合纵、观势、制衡完成胜利；自己的回合开始时恢复 12 兵力'}
+};
+
+const SKILLS={
+  lord:{name:'战旗号令',icon:'⚑',cost:60,cd:3,type:'aoe-ally',
+    desc:'2 格内友军回复 30 兵力，本回合攻击 +20%'},
+  brave:{name:'狂暴突袭',icon:'⚡',cost:50,cd:2,type:'self-rage',
+    desc:'本回合攻击 +50%，受到伤害 +20%'},
+  sage:{name:'火计焚营',icon:'🔥',cost:70,cd:3,type:'aoe-enemy',
+    desc:'3 格内所有敌人受到 30 伤害'},
+  guard:{name:'铁壁结阵',icon:'⛨',cost:40,cd:2,type:'self-shield',
+    desc:'本回合受到伤害减半，回复 20 兵力'},
+  mxy_lord:{name:'遣使',icon:'✉',cost:50,cd:3,type:'mxy-envoy',
+    desc:'仅在「会盟两方」期间可用。进入外交护行状态：受到伤害 -45%，三方 AI 会降低追击优先级；护行期间不能主动攻击。'}
+};
+const MXY_BALANCE_SKILL={name:'制衡令',icon:'衡',cost:60,cd:3,range:4,requiredDamage:120,duration:2,
+  desc:'仅在「制衡强权」阶段可用。需接近当前最强势力代表 4 格内；施令后其他主要势力更倾向攻击该势力，期限内累计受到 120 点其他势力伤害即完成制衡。'};
+
+const BOSSES = {
+  XZR:{key:'XZR',name:'XZR',title:'铁 腕 执 政',
+    icon:'⚔',color:'#ffaa33',hp:1300,atk:62,mov:2,range:2,pattern:'bossring',
+    skill:'戒严令',skillDesc:'压制敌军；低血量阶段扩大范围并连续镇压'},
+  FXY:{key:'FXY',name:'FXY',title:'天 灾 之 主',
+    icon:'✵',color:'#ff2a4a',hp:1150,atk:68,mov:2,range:2,pattern:'bossring',
+    skill:'天灾本源',skillDesc:'释放天灾轰击 / 召唤傀儡 / 陨石雨，阶段越低越猛烈'},
+  LBL:{key:'LBL',name:'LBL',title:'混 沌 之 影',
+    icon:'☯',color:'#9b59b6',hp:1050,atk:58,mov:3,range:1,pattern:'ring',
+    skill:'混沌低语',skillDesc:'控制、隐身与瞬移；后期同时扰乱多名武将'}
+};
+
+const BOSS_RULES={
+  damageTaken:0.80,          // 战斗伤害减免 20%
+  hpGrowthPerRound:0.08,     // 晚于第5回合每回合 +8% HP
+  atkGrowthPerRound:0.04,    // 晚于第5回合每回合 +4% ATK
+  phase2Pct:0.70,
+  phase3Pct:0.35,
+  regenNormal:0.05,
+  regenFinal:0.03
+};
+
+
+/* ==================== ZY · 中立NPC ==================== */
+const ZY_TRUST_START={GYC:6,LLY:12,JYM:-6,MXY:24};
+const ZY_SUPPORT_MIN_TRUST=20;
+const ZY_SUPPORT_COOLDOWN=3;
+function zyAttitudeName(v){
+  if(v>=70)return '深度协作';
+  if(v>=45)return '信任';
+  if(v>=20)return '认可';
+  if(v>=0)return '观察';
+  return '警惕';
+}
+function zyLabPos(){return [1,ROWS-2];}
+
+const CLINICAL_PARTNERS = [
+  {key:'clinician',type:'clinician',name:'住院医师',icon:'医',threshold:55,
+   desc:'每回合救治伤势最重的两名友军，各回复 18 兵力'},
+  {key:'nurse',type:'nurse',name:'急诊护士',icon:'护',threshold:125,
+   desc:'每回合为伤势最重的友军补充 25 护盾'},
+  {key:'chief',type:'chief',name:'临床主任',icon:'主',threshold:220,
+   desc:'每回合全体 +10 能量，并获得 8% 攻击增益'}
+];
+
+const BATTLE_EVENTS = [
+  {key:'mdt',name:'多学科会诊',icon:'✚',desc:'战况最弱的一方获得临床支援与额外资源',
+   apply(){
+     const facs=['GYC','LLY','JYM'];
+     const ranked=facs.map(f=>({f,n:G.units.filter(u=>u.faction===f&&u.hp>0).length,score:clinicalScore(f)}))
+       .sort((a,b)=>a.n-b.n||a.score-b.score);
+     const f=ranked[0].f;
+     G.clinical.bonus[f]+=50;G.gold[f]+=40;
+     return `${factionName(f)} 获得 +50 临床协作、+40 金`;
+   }},
+  {key:'ambulance',name:'急救车抵达',icon:'🚑',desc:'三方各有一名重伤单位获得紧急救治',
+   apply(){
+     let n=0;['GYC','LLY','JYM'].forEach(f=>{
+       const u=G.units.filter(x=>x.faction===f&&x.hp>0&&x.hp<x.maxHp).sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];
+       if(u){const h=Math.min(35,u.maxHp-u.hp);u.hp+=h;float(u,h,'heal');healFX(u.x,u.y);n++;}
+     });
+     return `共救治 ${n} 名重伤单位`;
+   }},
+  {key:'supply',name:'药械补给',icon:'▣',desc:'一方随机获得临床资源补给',
+   apply(){
+     const f=['GYC','LLY','JYM'][Math.floor(Math.random()*3)];
+     G.gold[f]+=80;G.clinical.bonus[f]+=25;
+     return `${factionName(f)} 获得 +80 金、+25 临床协作`;
+   }},
+  {key:'infection',name:'院感预警',icon:'☣',desc:'全场进入短暂应激状态，所有普通单位轻微失血',
+   apply(){
+     let n=0;G.units.forEach(u=>{if(u.hp>1&&!u.isBoss&&!u.isMinion){const d=Math.min(10,u.hp-1);u.hp-=d;float(u,d,'dis');n++;}});
+     return `${n} 名单位各损失至多 10 兵力（不会因此阵亡）`;
+   }},
+  {key:'transfusion',name:'紧急输血',icon:'🩸',desc:'随机数名伤员获得快速恢复',
+   apply(){
+     const arr=G.units.filter(u=>u.hp>0&&u.hp<u.maxHp&&!u.isBoss).sort(()=>Math.random()-0.5).slice(0,4);
+     arr.forEach(u=>{const h=Math.min(28,u.maxHp-u.hp);u.hp+=h;float(u,h,'heal');});
+     return `${arr.length} 名伤员回复 28 兵力`;
+   }},
+  {key:'pathway',name:'临床路径调整',icon:'⌘',desc:'三方都获得少量临床协作进度',
+   apply(){
+     ['GYC','LLY','JYM'].forEach(f=>G.clinical.bonus[f]+=18);
+     return `三方临床协作均 +18`;
+   }}
+];
+
+const CARDS = [
+  {key:'rage',name:'狂暴符',icon:'⚡',color:'#ff6b3d',desc:'选中单位本回合攻击 +60%',target:'unit',
+   use(u){ if(!u||u.faction!==G.player)return false;
+     u.rageBuff=true;log(`【功能卡】<b>狂暴符</b> 施加于 ${u.typeName}，本回合攻击 +60%`,'card');
+     return true;}},
+  {key:'shield',name:'护盾符',icon:'⛨',color:'#6bb8ff',desc:'选中单位获得 40 点护盾',target:'unit',
+   use(u){ if(!u||u.faction!==G.player)return false;
+     u.shield=(u.shield||0)+40;float(u,40,'shield');
+     log(`【功能卡】<b>护盾符</b> 施加于 ${u.typeName}，获得 40 护盾`,'card');
+     return true;}},
+  {key:'heal',name:'治疗符',icon:'✚',color:'#7ee08a',desc:'选中单位回复 50 兵力',target:'unit',
+   use(u){ if(!u||u.faction!==G.player)return false;
+     const h=50;u.hp=Math.min(u.maxHp,u.hp+h);float(u,h,'heal');healFX(u.x,u.y);
+     log(`【功能卡】<b>治疗符</b> 施加于 ${u.typeName}，回复 50 兵力`,'card');
+     return true;}},
+  {key:'haste',name:'神速符',icon:'⚑',color:'#f0d879',desc:'选中单位本回合移动力 +2 且可再次行动',target:'unit',
+   use(u){ if(!u||u.faction!==G.player)return false;
+     u.movBonus=(u.movBonus||0)+2;u.moved=false;u.acted=false;
+     log(`【功能卡】<b>神速符</b> 施加于 ${u.typeName}，可再次行动`,'card');
+     return true;}},
+  {key:'tp',name:'传送符',icon:'✦',color:'#ffd166',desc:'选中单位随机传送到空位',target:'unit',
+   use(u){ if(!u||u.faction!==G.player)return false;
+     const spots=[];
+     for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+       if(isPassableTile(x,y) && !unitAt(x,y)) spots.push([x,y]);
+     }
+     if(!spots.length)return false;
+     const [nx,ny]=spots[Math.floor(Math.random()*spots.length)];
+     u.x=nx;u.y=ny;slashAt(nx,ny,'skill');
+     log(`【功能卡】<b>传送符</b> 将 ${u.typeName} 传送至 (${nx},${ny})；剩余移动资格保留，移动范围从新位置重新计算。`,'card');
+     return true;}},
+  {key:'punish',name:'天罚符',icon:'☄',color:'#9b59b6',desc:'对全场随机 3 个敌方单位造成 35 伤害',target:'global',
+   use(){
+     const enemies=alive().filter(e=>e.faction!==G.player);
+     if(!enemies.length)return false;
+     const targets=enemies.slice().sort(()=>Math.random()-0.5).slice(0,3);
+     targets.forEach((t,i)=>{
+       setTimeout(()=>{
+         thunderFX(t.x,t.y);
+         const dmg=mitigateBossDamage(t,35);t.hp-=dmg;float(t,dmg,'dis');shakeUnit(t);
+         if(G.stats.damageDealt[G.player]!==undefined)G.stats.damageDealt[G.player]+=dmg;
+         if(t.isBoss&&G.stats.bossDamage[G.player]!==undefined)G.stats.bossDamage[G.player]+=dmg;
+         if(t.hp<=0){
+           log(`<b>${factionName(t.faction)} · ${t.typeName}</b> 被天罚击杀`,'kill');
+           if(G.stats.unitsLost[t.faction]!==undefined)G.stats.unitsLost[t.faction]++;
+           if(G.stats.kills[G.player]!==undefined)G.stats.kills[G.player]++;
+           recordRebelHead(t,G.player);
+         }
+         renderUnits();renderHUD();
+         setTimeout(checkWin,200);
+       },i*180);
+     });
+     log(`【功能卡】<b>天罚符</b> 命中 ${targets.length} 名敌人`,'card');
+     return true;}}
+];
+
+const DEPLOY = {
+  GYC: [['lord',7,10],['brave',6,10],['sage',8,10],['guard',5,10],['guard',9,10]],
+  LLY: [['lord',13,1],['sage',12,1],['brave',13,2],['guard',12,2],['guard',14,2]],
+  JYM: [['lord',1,1],['sage',2,1],['brave',1,2],['guard',2,2],['guard',0,2]]
+};
+
+const LEVEL_EXP = [0,100,250,450,700,1000,1400];
+
+const EDICTS = [
+  {who:'9013 · 执棋',text:'“棋局既定。”——全体回复 22 兵力',
+   fn(){G.units.forEach(u=>{if(u.hp>0){u.hp=Math.min(u.maxHp,u.hp+22);float(u,22,'heal');}});}},
+  {who:'XZR · 铁腕',text:'“我说的话，就是规矩。”——当前势力攻击 +35%',
+   fn(){G.units.forEach(u=>{if(u.hp>0&&u.faction===G.current)u.buff=1.35;});}},
+  {who:'MXY · 调和',text:'“坐下来谈。”——全体回复 12，攻击 -10%',
+   fn(){G.units.forEach(u=>{if(u.hp>0){u.hp=Math.min(u.maxHp,u.hp+12);u.buff=0.9;float(u,12,'heal');}});}},
+  {who:'ZY · 离线校验',text:'“只校验技术，不替任何人站队。”——三方各一名重伤核心单位获得 25 护盾',
+   fn(){MAJOR_FACTIONS.forEach(f=>{const u=G.units.filter(x=>x.hp>0&&x.faction===f&&PRINCE_CORE_TYPES.has(x.type)).sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];if(u){u.shield=(u.shield||0)+25;}});}},
+  {who:'9013 · 诏令',text:'“天下大势，分久必合。”——所有单位移动力 +1（本回合）',
+   fn(){G.units.forEach(u=>{if(u.hp>0)u.movBonus=1;});}},
+  {who:'XZR · 征兵',text:'“兵者，国之大事。”——每个势力 +80 金',
+   fn(){G.gold.GYC+=80;G.gold.LLY+=80;G.gold.JYM+=80;}}
+];
+
+/* ==================== 天灾系统 ==================== */
+const DISASTERS=[
+  {key:'meteor',name:'陨 石 雨',icon:'☄️',color:'#ff6b3d',desc:'随机 4 格遭受陨石轰击',
+   long:'天降火雨，无差别轰击战场',duration:1,instant:true,
+   apply(){
+     for(let i=0;i<4;i++){
+       const x=Math.floor(Math.random()*COLS),y=Math.floor(Math.random()*ROWS);
+       setTimeout(()=>{
+         meteorFX(x,y);
+         const u=unitAt(x,y);
+         if(u){const dmg=40;u.hp-=dmg;float(u,dmg,'dis');shakeUnit(u);
+           log(`☄️ 陨石击中 ${u.typeName}，造成 <b>${dmg}</b> 伤害`,'dis');
+           if(u.hp<=0)log(`<b>${factionName(u.faction)} · ${u.typeName}</b> 被陨石砸中阵亡`,'kill');}
+       },i*160);
+     }
+   }},
+  {key:'plague',name:'瘟 疫',icon:'☠️',color:'#7ee08a',desc:'每回合损失 5% 兵力',
+   long:'瘟疫蔓延，无人可以幸免',duration:2,instant:false,
+   perTurn(){
+     G.units.forEach(u=>{if(u.hp>0){const dmg=Math.max(3,Math.round(u.maxHp*0.05));u.hp-=dmg;float(u,dmg,'dis');
+       if(u.hp<=0)log(`<b>${factionName(u.faction)} · ${u.typeName}</b> 死于瘟疫`,'kill');}});
+     log(`☠️ 瘟疫蔓延，全场单位损失 5% 兵力`,'dis');
+   }},
+  {key:'fire',name:'山 火',icon:'🔥',color:'#ff5b3a',desc:'森林起火，站其上每回合受 20 伤害',
+   long:'山火燎原，森林化为焦土',duration:3,instant:false,
+   perTurn(){
+     G.units.forEach(u=>{if(u.hp>0 && MAP[u.y][u.x]===1){const dmg=20;u.hp-=dmg;float(u,dmg,'dis');
+       if(u.hp<=0)log(`<b>${factionName(u.faction)} · ${u.typeName}</b> 被山火吞噬`,'kill');}});
+     log(`🔥 山火蔓延，森林中的单位受到 20 伤害`,'dis');
+   }},
+  {key:'flood',name:'洪 水',icon:'🌊',color:'#4a9eff',desc:'河流及相邻格每回合受 12 伤害',
+   long:'洪水滔天，河流吞噬两岸',duration:2,instant:false,
+   perTurn(){
+     G.units.forEach(u=>{
+       if(u.hp<=0) return;
+       let nearRiver = MAP[u.y][u.x]===3;
+       if(!nearRiver){for(const [dx,dy] of DIRS){const nx=u.x+dx,ny=u.y+dy;if(inBoard(nx,ny)&&MAP[ny][nx]===3){nearRiver=true;break;}}}
+       if(nearRiver){const dmg=12;u.hp-=dmg;float(u,dmg,'dis');
+         if(u.hp<=0)log(`<b>${factionName(u.faction)} · ${u.typeName}</b> 被洪水卷走`,'kill');}
+     });
+     log(`🌊 洪水暴涨，河岸单位受到 12 伤害`,'dis');
+   }},
+  {key:'quake',name:'地 震',icon:'⛰️',color:'#c9a227',desc:'全场 15 伤害，随机摧毁 2 处山地',
+   long:'大地震颤，山河改道',duration:1,instant:true,
+   apply(){
+     boardEl.classList.add('shake-d');
+     setTimeout(()=>boardEl.classList.remove('shake-d'),650);
+     G.units.forEach(u=>{if(u.hp>0){const dmg=15;u.hp-=dmg;float(u,dmg,'dis');shakeUnit(u);
+       if(u.hp<=0)log(`<b>${factionName(u.faction)} · ${u.typeName}</b> 被震死`,'kill');}});
+     const mountains=[];
+     for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(MAP[y][x]===2)mountains.push([x,y]);
+     let destroyed=0;
+     while(destroyed<2 && mountains.length){
+       const idx=Math.floor(Math.random()*mountains.length);
+       const [x,y]=mountains.splice(idx,1)[0];
+       if(!unitAt(x,y)){MAP[y][x]=0;quakeFX(x,y);destroyed++;}
+     }
+     log(`⛰️ 地震爆发，全场单位受到 15 伤害，${destroyed} 处山地坍塌`,'dis');
+     rebuildTiles();
+   }},
+  {key:'storm',name:'沙 尘 暴',icon:'🌪️',color:'#d4af37',desc:'全场射程 -1',
+   long:'沙尘蔽日，视野受阻',duration:2,instant:false,
+   apply(){log(`🌪️ 沙尘暴起，全场单位射程 -1`,'dis');}},
+  {key:'blizzard',name:'暴 风 雪',icon:'❄️',color:'#7ec8e3',desc:'非中枢区域单位每回合受 8 伤害，移动力 -1',
+   long:'暴雪封路，严寒刺骨',duration:3,instant:false,
+   perTurn(){
+     G.units.forEach(u=>{if(u.hp>0 && !onZY(u.x,u.y)){const dmg=8;u.hp-=dmg;float(u,dmg,'dis');
+       if(u.hp<=0)log(`<b>${factionName(u.faction)} · ${u.typeName}</b> 冻毙于风雪`,'kill');}});
+     log(`❄️ 暴风雪肆虐，非中枢区域单位受到 8 伤害`,'dis');
+   }},
+  {key:'thunder',name:'雷 暴',icon:'⚡',color:'#ffd166',desc:'随机 3 名单位受 35 伤害',
+   long:'天雷降下，雷霆万钧',duration:1,instant:true,
+   apply(){
+     const targets=alive().slice().sort(()=>Math.random()-0.5).slice(0,3);
+     targets.forEach((u,i)=>{
+       setTimeout(()=>{
+         thunderFX(u.x,u.y);
+         const dmg=35;u.hp-=dmg;float(u,dmg,'dis');shakeUnit(u);
+         log(`⚡ 天雷击中 ${u.typeName}，造成 <b>${dmg}</b> 伤害`,'dis');
+         if(u.hp<=0)log(`<b>${factionName(u.faction)} · ${u.typeName}</b> 被雷劈死`,'kill');
+       },i*220);
+     });
+   }},
+  {key:'zy-surge',name:'中 枢 算 力 潮 汐',icon:'✦',color:'#c79ee0',desc:'9013 中枢算力池过载，范围内单位回血 +20、攻击 +20%',
+   long:'实验室能量外溢，异象环生',duration:2,instant:false,
+   perTurn(){
+     G.units.forEach(u=>{if(u.hp>0 && onZY(u.x,u.y)){const heal=20;u.hp=Math.min(u.maxHp,u.hp+heal);
+       float(u,heal,'heal');healFX(u.x,u.y);u.zyBuff=true;}});
+     log(`✦ 中枢算力潮汐持续，算力池内单位回复 20 兵力`,'dis');
+   }},
+  {key:'bloodmoon',name:'血 色 之 夜',icon:'💀',color:'#ff85a2',desc:'全场攻击 +30%，每回合损失 8% 兵力',
+   long:'血月凌空，杀意沸腾',duration:2,instant:false,
+   apply(){log(`💀 血色之夜降临，全场单位攻击 +30%，但生命在流逝`,'dis');},
+   perTurn(){
+     G.units.forEach(u=>{if(u.hp>0){const dmg=Math.max(4,Math.round(u.maxHp*0.08));u.hp-=dmg;float(u,dmg,'dis');
+       if(u.hp<=0)log(`<b>${factionName(u.faction)} · ${u.typeName}</b> 在血月下倒下`,'kill');}});
+     log(`💀 血月笼罩，全场单位损失 8% 兵力`,'dis');
+   }}
+];
+
+/* ==================== 游戏状态 ==================== */
+const START_FACTIONS=['GYC','LLY','JYM','MXY'];
+const G={
+  units:[],order:['GYC','LLY','JYM'],current:'GYC',player:'GYC
