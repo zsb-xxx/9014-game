@@ -108,3 +108,43 @@ px 9px}
   .start-brand{font-size:34px}.start-disclaimer{font-size:9px}
 }
 
+/* ==================== v0.9.2：侧栏独立滚动与信息可见性 ==================== */
+@media (min-width:1161px){
+  /* 顶部回合信息保持可见，标签内容在剩余高度内单独滚动 */
+  .side{overflow:hidden;padding-bottom:2px}
+  .side-left>.hud-tab-shell,.side-right>.hud-tab-shell{
+    flex:1 1 auto;min-height:0;position:relative;overflow:hidden
+  }
+  .hud-tabs{
+    flex:0 0 auto;position:relative;z-index:6;
+    background:linear-gradient(180deg,rgba(7,7,12,.98),rgba(12,12,19,.94));
+    backdrop-filter:blur(8px)
+  }
+  .hud-tab-pane.active{
+    flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
+    padding-right:7px;padding-bottom:28px;
+    overscroll-behavior:contain;scroll-behavior:smooth;scrollbar-gutter:stable;
+    scrollbar-width:thin;scrollbar-color:rgba(212,175,55,.58) rgba(255,255,255,.035);
+    box-shadow:inset 0 -20px 22px -25px rgba(212,175,55,.55)
+  }
+  .hud-tab-pane.active::-webkit-scrollbar{width:9px}
+  .hud-tab-pane.active::-webkit-scrollbar-track{background:rgba(255,255,255,.025);border-radius:8px}
+  .hud-tab-pane.active::-webkit-scrollbar-thumb{
+    background:linear-gradient(180deg,rgba(239,215,123,.68),rgba(155,132,67,.4));
+    border:2px solid rgba(8,8,13,.9);border-radius:10px
+  }
+  .hud-tab-pane.active::-webkit-scrollbar-thumb:hover{
+    background:linear-gradient(180deg,rgba(255,229,154,.9),rgba(212,175,55,.65))
+  }
+
+  /* 单位、临床、ZY、领主事件等动态长内容不再被面板裁切 */
+  .unit-info,.mxy-info,.zy-npc-info,#clinicalInfo,.skill-box,.edict{overflow:visible}
+  .right-tab-shell .hud-tab-pane[data-tab-pane="unit"] .unit-panel{min-height:0}
+  .right-tab-shell .hud-tab-pane[data-tab-pane="report"] .report-panel{min-height:0;display:flex;flex-direction:column}
+  .right-tab-shell .hud-tab-pane[data-tab-pane="report"] .log{flex:1 1 auto;min-height:250px;height:auto;max-height:none}
+}
+
+/* 平板/手机保持整页自然滚动，避免双层滚动手势冲突 */
+@media (max-width:1160px){
+  .hud-tab-pane.active{overflow:visible;padding-right:0;padding-bottom:0}
+}
