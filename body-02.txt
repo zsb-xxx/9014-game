@@ -1,0 +1,176 @@
+s="m-sec">
+      <div class="m-sec-h">🎴 功 能 卡 系 统</div>
+      <p style="margin-bottom:10px">
+        每回合开始时可能获得 1 张功能卡。手牌上限 <b>4 张</b>。
+      </p>
+      <div class="m-row"><div class="m-ico" style="--c:#7ee08a">⚡</div>
+        <div><b>狂暴符</b> · 选中单位本回合攻击 +60%</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#6bb8ff">⛨</div>
+        <div><b>护盾符</b> · 选中单位获得 40 点护盾</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#7ee08a">✚</div>
+        <div><b>治疗符</b> · 选中单位回复 50 兵力</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#f0d879">⚑</div>
+        <div><b>神速符</b> · 选中单位本回合移动力 +2 且可再次行动</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#ffd166">✦</div>
+        <div><b>传送符</b> · 选中单位随机传送到空位</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#9b59b6">☄</div>
+        <div><b>天罚符</b> · 对全场随机 3 个敌方单位造成 35 伤害</div></div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">✚ 临 床 伙 伴 系 统</div>
+      <p style="margin-bottom:10px">
+        三个势力都拥有独立的<b>临床协作进度</b>。回合推进、造成伤害、击杀、接管算力节点和 BOSS 输出都会提高进度。
+        达到阈值后伙伴会自动在本势力统帅附近增援；<b>每个势力都可以最终解锁全部临床伙伴</b>。
+      </p>
+      <div class="m-row"><div class="m-ico" style="--c:#79e0d3">医</div><div><b>住院医师 · 55</b> · 每回合为伤势最重的两名友军各回复 18 兵力</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#79e0d3">护</div><div><b>急诊护士 · 125</b> · 每回合为伤势最重的友军补充 25 护盾</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#79e0d3">主</div><div><b>临床主任 · 220</b> · 每回合全体友军 +10 能量，并获得小幅攻击增益</div></div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">🎲 战 局 随 机 事 件</div>
+      <p>该系统独立于天灾与 9013 诏令。战局中可能触发额外事件，事件可能带来会诊支援、急救车、药械补给、院感预警等变化，既可能扶弱，也可能扰乱全场。</p>
+    </div>
+
+
+    <div class="m-sec">
+      <div class="m-sec-h">⚔ 阵 前 单 挑 系 统</div>
+      <p style="margin-bottom:10px">
+        从第 <b>2 回合</b> 起，普通核心兵种发生<b>近身攻击</b>时可能触发阵前单挑；每个完整回合最多出现 1 次。
+        临床伙伴、傀儡与 BOSS 不参与单挑。
+      </p>
+      <div class="m-row"><div class="m-ico" style="--c:#ffd166">力</div>
+        <div><b>战力为主</b> · 有效攻击、等级、最大兵力、当前兵力状态共同形成单挑战力；兵种克制只提供小幅修正</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#ff6b4a">🎲</div>
+        <div><b>临阵波动</b> · 战力计算完成后仍保留小幅临场变化，因此强者明显占优，但弱者仍存在翻盘空间</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#ff8574">伤</div>
+        <div><b>高风险结算</b> · 单挑会替代本次普通攻击。败者会受到重创，胜者也会负伤；战力差越大，败者受创越重</div></div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">👁 卧 底 系 统</div>
+      <p style="margin-bottom:10px">
+        每个势力开局有 1 名卧底（真实阵营为随机另一个势力），外观与普通单位一致；统帅属于阵营核心，绝不会成为卧底或倒戈。
+      </p>
+      <div class="m-row"><div class="m-ico" style="--c:#ff2a4a">⏱</div>
+        <div><b>暴露时机</b> · 第 4 回合起卧底可能暴露，进入战局后期后暴露风险进一步提高</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#ff2a4a">⚔</div>
+        <div><b>叛变效果</b> · 立即转为真实阵营，对周围 1 格原阵营单位造成 25 伤害</div></div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">⚠ 三 大 BOSS</div>
+      <p style="margin-bottom:10px">
+        当本局启用 BOSS 规则时，从第 <b>5 回合</b> 起 BOSS 可能降临。
+        BOSS 降临后，三方主要势力会优先联合讨伐；若玩家为 MXY，领主仍以完成事件链为最终胜利条件。
+      </p>
+      <div class="m-row"><div class="m-ico" style="--c:#ffaa33">⚔</div>
+        <div><b>XZR · 铁腕执政</b> · 基础 HP 1300 / ATK 62<br>擅长压制与耐久；第二阶段扩大戒严范围，最终阶段连续镇压</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#ff2a4a">✵</div>
+        <div><b>FXY · 天灾之主</b> · 基础 HP 1150 / ATK 68<br>擅长群体爆发；低血量阶段增加轰击伤害、傀儡和陨石数量</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#9b59b6">☯</div>
+        <div><b>LBL · 混沌之影</b> · 基础 HP 1050 / ATK 58<br>擅长控制与闪避；隐身闪避随阶段强化，但首次成功命中会破除，且不与地形闪避叠加</div></div>
+      <p style="margin-top:10px"><b>第六版强化规则：</b> BOSS 对普通攻击、技能与功能卡的战斗伤害减免 20%；若晚于第 5 回合降临，每晚 1 回合获得 +8% 最大兵力与 +4% 攻击。生命降至 70% 以下进入第二阶段（攻击 +25%），35% 以下进入最终阶段（攻击 +50%、每轮行动两次）。前两阶段每轮回复 5% 最大兵力，最终阶段回复 3%。</p>
+      <p style="margin-top:8px"><b>讨伐结算：</b>击败 BOSS 不会直接结束游戏。对 BOSS 造成过伤害的主要势力获得参与奖励；伤害最高者成为「讨伐魁首」，获得额外金币、全军整备与经验。随后三方争霸继续。</p>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">基 本 操 作</div>
+      <div class="m-row"><div class="m-ico" style="--c:#6bb8ff">1</div><div><b>点击己方单位</b> 选中，显示蓝(移动)红(攻击)范围。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#6bb8ff">2</div><div><b>点击蓝色格</b> 移动；移动后射程内有敌人可继续攻击。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#ff5f4d">3</div><div><b>点击红色范围内敌人</b> 发动攻击。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#c79ee0">4</div><div><b>点击技能按钮</b> 进入技能模式，紫色范围显示。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#7ee08a">5</div><div><b>点击功能卡</b> 使用卡牌（部分卡需要先选中单位）。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#f0d879">6</div><div><b>点击结束回合</b> 交给下一方。</div></div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">兵 种 与 攻 击 范 围</div>
+      <div class="m-row"><div class="m-ico" style="--c:#d4af37">♔</div><div><b>统帅</b> · 攻击周围 8 格。光环：相邻友军每回合回血 8。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#e74c3c">⚔</div><div><b>猛将</b> · 攻击 4 个正交方向，高移动高伤害。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#2ecc71">✎</div><div><b>谋士</b> · 沿直线攻击 1~3 格（需视线）。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#3498db">⛨</div><div><b>精兵</b> · 攻击 4 个斜角方向，受伤 -15%。</div></div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">克 制 关 系（克制×1.5，被克×0.75）</div>
+      <div class="ct-grid">
+        <div class="ct-card"><div class="cti">⚔</div><div class="ctn">猛将</div><div class="ctl">克统帅<em>被谋士克</em></div></div>
+        <div class="ct-card"><div class="cti">♔</div><div class="ctn">统帅</div><div class="ctl">克精兵<em>被猛将克</em></div></div>
+        <div class="ct-card"><div class="cti">⛨</div><div class="ctn">精兵</div><div class="ctl">克谋士<em>被统帅克</em></div></div>
+        <div class="ct-card"><div class="cti">✎</div><div class="ctn">谋士</div><div class="ctl">克猛将<em>被精兵克</em></div></div>
+      </div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">地 形 效 果</div>
+      <div class="m-row"><div class="m-ico" style="--c:#0d1a10">🌲</div><div><b>森林</b> · 闪避 +20%，移动消耗 2。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#1a1510">⛰</div><div><b>山地</b> · 防御 ×1.3，射程 -1，不可通行，挡视线。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#0d1520">🌊</div><div><b>河流</b> · 射程 -1，移动消耗 2。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#1a150d">⛫</div><div><b>算力节点</b> · 回血 +10，占领后 +15 金收入。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#150d1a">◆</div><div><b>9013中枢算力池</b> · 攻击 ×1.25，每回合回血 +15。</div></div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">⚠ 天 灾 系 统</div>
+      <p style="margin-bottom:10px">
+        从第 <b>2 回合</b> 开始，战局中可能触发天灾；
+        每 <b>5 回合</b> 会迎来一次强力天灾。
+      </p>
+      <div class="dis-grid">
+        <div class="dis-card" style="--c:#ff6b3d"><div class="dn"><span class="di">☄️</span>陨石雨</div>
+          <div class="dd">随机 4 格遭受陨石轰击，每格 40 伤害</div></div>
+        <div class="dis-card" style="--c:#7ee08a"><div class="dn"><span class="di">☠️</span>瘟疫</div>
+          <div class="dd">持续 2 回合，每回合损失 5% 兵力</div></div>
+        <div class="dis-card" style="--c:#ff5b3a"><div class="dn"><span class="di">🔥</span>山火</div>
+          <div class="dd">持续 3 回合，森林单位每回合受 20</div></div>
+        <div class="dis-card" style="--c:#4a9eff"><div class="dn"><span class="di">🌊</span>洪水</div>
+          <div class="dd">持续 2 回合，河岸单位每回合受 12</div></div>
+        <div class="dis-card" style="--c:#c9a227"><div class="dn"><span class="di">⛰️</span>地震</div>
+          <div class="dd">全场 15 伤害，随机摧毁 2 处山地</div></div>
+        <div class="dis-card" style="--c:#d4af37"><div class="dn"><span class="di">🌪️</span>沙尘暴</div>
+          <div class="dd">持续 2 回合，全场射程 -1</div></div>
+        <div class="dis-card" style="--c:#7ec8e3"><div class="dn"><span class="di">❄️</span>暴风雪</div>
+          <div class="dd">持续 3 回合，非中枢 单位受 8 / 移动-1</div></div>
+        <div class="dis-card" style="--c:#ffd166"><div class="dn"><span class="di">⚡</span>雷暴</div>
+          <div class="dd">随机 3 名单位受 35 伤害</div></div>
+        <div class="dis-card" style="--c:#c79ee0"><div class="dn"><span class="di">✦</span>中枢算力潮汐</div>
+          <div class="dd">持续 2 回合，中枢区回血 +20 攻击 +20%</div></div>
+        <div class="dis-card" style="--c:#ff85a2"><div class="dn"><span class="di">💀</span>血色之夜</div>
+          <div class="dd">持续 2 回合，全场攻+30% 每回合损失 8%</div></div>
+      </div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">主 动 技 能（100 能量，每回合 +25）</div>
+      <div class="m-row"><div class="m-ico" style="--c:#d4af37">⚑</div><div><b>统帅 · 战旗号令</b>（60能量，CD3）· 2 格内友军回 30 兵力，攻击 +20%。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#e74c3c">⚡</div><div><b>猛将 · 狂暴突袭</b>（50能量，CD2）· 攻击 +50%，受伤 +20%。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#2ecc71">🔥</div><div><b>谋士 · 火计焚营</b>（70能量，CD3）· 3 格内敌人受 30 伤害。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#3498db">⛨</div><div><b>精兵 · 铁壁结阵</b>（40能量，CD2）· 受伤减半，回血 20。</div></div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">势 力 专 属 技 能</div>
+      <div class="m-row"><div class="m-ico" style="--c:#e74c3c">⚔</div><div><b>GYC · 藏锋破局</b> · 兵力低于 50% 时攻击 +40%。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#3498db">⛨</div><div><b>LLY · 开源共振</b> · 每回合全体回 12 兵力。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#2ecc71">✎</div><div><b>JYM · 灰域游击</b> · 谋士射程 +1，全体移动 +1。</div></div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">小 说 世 界 观 映 射</div>
+      <div class="m-row"><div class="m-ico" style="--c:#79e0d3">隐</div><div><b>ZY · 量子隐士</b> · ZY 不再是可占领中央据点，而是位于地图边缘的中立 NPC。其离线实验室不可进入；他会观察各方是否处理共同威胁、是否过度垄断中枢，并按信任提供有限技术支援。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#9b59b6">13</div><div><b>9013 中枢算力池</b> · 原中央 2×2 区域改为公共权力/算力核心，仍承担战略争夺、BOSS降临和部分胜利条件。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#d4af37">⛫</div><div><b>算力节点</b> · 原“城镇”改为科研/算力节点，机制不变，用于资源与战略网络构建。</div></div>
+    </div>
+
+    <div class="m-sec">
+      <div class="m-sec-h">特 殊 机 制</div>
+      <div class="m-row"><div class="m-ico" style="--c:#ffd166">夹</div><div><b>夹击</b> · 从目标两侧同时攻击 → 伤害 +50%。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#9b59b6">诏</div><div><b>9013 诏令</b> · 每 3 回合触发全局事件。</div></div>
+      <div class="m-row"><div class="m-ico" style="--c:#f0d879">金</div><div><b>资源</b> · 基础 5 金/回合；GYC 节点 +15 金，LLY / JYM 节点 +18 金；50 金升级，30 金治疗。</div></div>
+    </div>
+  </div>
+</div>
+
+
