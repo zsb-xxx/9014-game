@@ -1,0 +1,396 @@
+clamp(20px,5vw,32px);letter-spacing:.3em;text-indent:.3em;
+  background:linear-gradient(180deg,#fffbe8,#e8cf7a 45%,#a8852a);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 26px rgba(212,175,55,.7))}
+.scenario-reveal .sr-desc{margin-top:12px;font-size:11.5px;letter-spacing:.16em;
+  color:#a89a7a;font-weight:300}
+
+@media (max-width:1200px){
+  .game{grid-template-columns:260px 1fr 260px}
+}
+@media (max-width:1100px){
+  .game{grid-template-columns:1fr;gap:10px}
+  .side{position:static;flex-direction:row;flex-wrap:wrap;gap:8px}
+  .side>.panel{flex:1;min-width:200px}
+  .board-wrap{order:-1;width:100%;justify-content:center}
+  .log{height:120px}
+  .ct-grid{grid-template-columns:repeat(2,1fr)}
+  .dis-grid{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .side>.panel{min-width:100%}
+  .fcards{gap:10px}
+  .fcard{width:170px;padding:18px 12px 16px}
+  .fcard .fn{font-size:21px}
+  .manual-box{padding:22px 16px 20px}
+  .disaster-banner{padding:10px 20px;top:70px}
+  .disaster-banner .db-ico{font-size:24px}
+  .disaster-banner .db-name{font-size:15px}
+  .disaster-banner .db-desc{font-size:9.5px}
+  .over-box{padding:26px 18px 22px}
+  .over-stats{grid-template-columns:repeat(2,1fr)}
+  .os-item.wide{grid-column:span 2}
+  .over-btns{flex-direction:column}
+  .over-btns .btn{width:100%;padding:12px}
+  .boss-bar .bb-name{font-size:11px;letter-spacing:.2em}
+  .cards-grid{grid-template-columns:1fr}
+  .cursor-glow{display:none}
+}
+
+
+/* =========================================================
+   第十版 · UI 清晰度与排版优化（仅呈现层，不改游戏规则）
+   ========================================================= */
+:root{
+  --ui-text:#e9e4da;
+  --ui-text-2:#c8c1b3;
+  --ui-muted:#969083;
+  --ui-panel:rgba(15,15,23,.94);
+  --ui-panel-2:rgba(22,22,32,.94);
+}
+html{font-size:15px}
+body{
+  color:var(--ui-text);
+  font-family:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;
+  font-weight:400;
+  line-height:1.55;
+  text-rendering:optimizeLegibility;
+}
+.top p{font-size:11.5px;letter-spacing:.26em;color:#989184}
+.scenario-tag{font-size:11.5px;letter-spacing:.16em}
+
+/* 桌面布局：加宽信息栏，保持棋盘中心稳定 */
+.game{
+  grid-template-columns:288px minmax(672px,1fr) 320px;
+  gap:14px;
+  max-width:1660px;
+  padding:14px;
+}
+.side{
+  gap:12px;
+  top:12px;
+  max-height:calc(100vh - 24px);
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:2px 5px 12px 2px;
+  scrollbar-gutter:stable;
+}
+.side::-webkit-scrollbar{width:7px}
+.side::-webkit-scrollbar-track{background:transparent}
+.side::-webkit-scrollbar-thumb{background:rgba(212,175,55,.28);border-radius:8px}
+.side::-webkit-scrollbar-thumb:hover{background:rgba(212,175,55,.5)}
+
+.panel{
+  padding:14px;
+  border-radius:9px;
+  background:linear-gradient(180deg,var(--ui-panel-2),var(--ui-panel));
+  border-color:rgba(212,175,55,.24);
+  box-shadow:0 8px 28px -14px rgba(0,0,0,.86),inset 0 1px 0 rgba(255,255,255,.045);
+}
+.panel:hover{
+  transform:none;
+  border-color:rgba(212,175,55,.38);
+  box-shadow:0 9px 32px -15px rgba(0,0,0,.9),0 0 22px -17px rgba(212,175,55,.65),inset 0 1px 0 rgba(255,255,255,.05)
+}
+.panel-h{
+  font-size:11.5px;
+  font-weight:700;
+  letter-spacing:.16em;
+  text-indent:.16em;
+  color:#efd77b;
+  opacity:1;
+  margin-bottom:12px;
+}
+
+/* 高频信息重点突出 */
+aside.side:first-of-type>.panel:first-child,
+aside.side:last-of-type>.panel:first-child{
+  border-color:rgba(240,216,121,.48);
+  box-shadow:0 10px 34px -18px rgba(212,175,55,.55),inset 0 0 22px rgba(212,175,55,.035);
+}
+aside.side:last-of-type>.panel:nth-child(2){
+  border-color:rgba(155,89,182,.36);
+}
+
+.turn-badge{gap:12px;margin-bottom:11px}
+.turn-dot{width:14px;height:14px}
+.turn-name{font-size:19px;font-weight:700;letter-spacing:.08em}
+.turn-sub{font-size:11.5px;letter-spacing:.07em;color:#aaa294;font-weight:400}
+.turn-count{font-size:12px;letter-spacing:.10em;color:#a19a8c}
+.turn-count b{font-size:17px;font-weight:700;color:#ffe59a}
+
+.res-grid{gap:9px}
+.res-item{padding:9px 10px;font-size:12.5px;background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08)}
+.res-item span{color:#aaa294;letter-spacing:.04em}
+.res-item b{font-size:13px;font-weight:700}
+
+.cards-panel{min-height:190px}
+.cards-grid{gap:9px}
+.card{padding:11px 9px}
+.card .c-ico{font-size:21px}
+.card .c-name{font-size:12px;font-weight:700;letter-spacing:.04em;color:#f5e6b2}
+.card .c-desc{font-size:10.5px;line-height:1.65;color:#9f988b;font-weight:400;letter-spacing:.01em}
+.card.empty .c-desc{font-size:11px;color:#6f695f}
+
+.fact{padding:9px 10px;font-size:13px;letter-spacing:.02em;margin-bottom:6px}
+.fname{color:#e1dacd;font-weight:600}
+.fnum{font-size:11.5px;color:#aaa294}
+
+.edict,.skill-box{
+  font-size:12.5px;
+  line-height:1.8;
+  color:#bcb4a6;
+  letter-spacing:.015em;
+  font-weight:400;
+}
+.edict b{font-size:12px;color:#ffe49b}
+.skill-box b{font-size:13px;font-weight:700}
+
+.zone-info,.disaster-info{font-size:12px;line-height:1.75;letter-spacing:.015em}
+.zone-info .zdur,.disaster-info .ddur{font-size:11px;color:#aaa294}
+.zone-info .zdesc,.disaster-info .ddesc{font-size:12px;color:#b1aa9c;line-height:1.75;font-weight:400;letter-spacing:.01em}
+.zone-info .zgrid{font-size:12.5px}
+.disaster-info .dhead{font-size:14px;font-weight:700;letter-spacing:.08em}
+
+/* 临床与 MXY：原来字号最小，统一提升 */
+.clinic-score span{font-size:11px;color:#94bbb5}
+.clinic-score b{font-size:15px}
+.clinic-partner{padding:9px 9px;grid-template-columns:28px 1fr auto;gap:8px}
+.clinic-partner .cp-ico{width:28px;height:28px;font-size:13px}
+.clinic-partner .cp-name{font-size:12px;font-weight:700}
+.clinic-partner .cp-desc{font-size:10.5px;line-height:1.55;color:#8da39f}
+.clinic-partner .cp-state{font-size:10.5px}
+.clinic-factions span{font-size:10px;padding:4px 7px}
+.clinic-last-event{font-size:10.8px;line-height:1.65;color:#91aaa6}
+
+.mxy-info{font-size:11.5px;line-height:1.7;color:#b5ab8e}
+.mxy-head{padding:9px 10px}
+.mxy-head b{font-size:12.5px}.mxy-head span{font-size:10.5px}
+.mxy-event{padding:8px 9px;margin-top:7px}
+.mxy-event .me-name{font-size:11.5px;font-weight:700}
+.mxy-event .me-desc{font-size:10.5px;line-height:1.55;color:#938c79}
+
+/* 单位情报：提高可扫读性 */
+.unit-info{min-height:238px}
+.ui-empty{font-size:13px;color:#777064;letter-spacing:.08em}
+.ui-head{gap:12px;margin-bottom:12px}
+.ui-avatar{width:48px;height:48px;font-size:21px}
+.ui-name{font-size:17px;font-weight:700;letter-spacing:.055em}
+.ui-sub{font-size:11.5px;color:#aaa294;letter-spacing:.07em}
+.ui-bar-row{gap:8px;margin-bottom:7px}
+.ui-bar-lbl{font-size:10.5px;color:#9e978a;width:36px}
+.ui-bar{height:7px}
+.ui-bar-val{font-size:11px;min-width:46px;color:#ded7ca}
+.ui-stats{gap:8px;font-size:11.8px;margin-bottom:10px}
+.ui-stat{padding:7px 8px}
+.ui-stat span{color:#9e978a;letter-spacing:.035em}
+.ui-stat b{color:#e0d8cb;font-weight:600}
+.ui-pattern{padding:9px 10px;font-size:12px;line-height:1.75;color:#b7afa2;font-weight:400;letter-spacing:.015em}
+.ct-tag{font-size:11px;padding:3px 7px}
+
+.action-row{gap:8px;margin-top:10px}
+.abtn{font-size:12px;padding:9px 6px;letter-spacing:.06em}
+.abtn.skill{font-size:12.5px;padding:11px 7px;letter-spacing:.10em}
+.abtn.skill small{font-size:10.5px}
+.btn{font-size:13px;letter-spacing:.14em;text-indent:.14em;padding:11px 10px;border-radius:6px}
+
+/* 战报：更大、更高、更清晰 */
+.log{
+  height:220px;
+  font-size:11.8px;
+  line-height:1.8;
+  color:#b3ac9f;
+  letter-spacing:.01em;
+  gap:4px;
+  padding-right:7px;
+  font-family:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC",sans-serif;
+}
+.log div{padding:5px 4px 5px 10px;border-left-width:3px}
+.log .sys{color:#c9bb8d}
+.log .hit{color:#e0b5af}
+.legend{gap:10px 12px;font-size:11.5px;color:#aaa294;letter-spacing:.02em}
+.legend .lg{gap:6px;font-weight:500}
+.legend .dot{width:11px;height:11px}
+
+/* 地块悬停：作为即时说明卡片展示 */
+.tile-tooltip{
+  min-width:225px;
+  max-width:315px;
+  padding:12px 13px;
+  border-radius:9px;
+  background:rgba(9,9,15,.985);
+  border-color:rgba(240,216,121,.62);
+  box-shadow:0 14px 40px rgba(0,0,0,.66),0 0 26px -10px rgba(212,175,55,.78);
+  color:#e0d9cd;
+  font-size:11.5px;
+  line-height:1.72;
+  letter-spacing:.01em;
+}
+.tile-tooltip .tt-head{margin-bottom:7px}
+.tile-tooltip .tt-name{font-size:13.5px;letter-spacing:.07em}
+.tile-tooltip .tt-pos{font-size:10px;color:#9b9487}
+.tile-tooltip .tt-line{gap:9px}
+.tile-tooltip .tt-k{color:#9e978a;min-width:58px;font-weight:600}
+.tile-tooltip .tt-v{color:#ded7ca}
+.tile-tooltip .tt-warn{margin-top:7px;padding-top:7px;color:#ffad99;font-weight:600}
+
+/* 开局与说明书字号同步提升 */
+.fcard .fl{font-size:12px;letter-spacing:.20em}
+.fcard .fd{font-size:12.5px;color:#aaa294;line-height:1.8;font-weight:400}
+.fcard .fskill{font-size:12px;line-height:1.7;color:#bbb3a5;font-weight:400}
+.manual-box{max-width:900px;padding:32px 34px 28px}
+.manual h3{font-size:22px;letter-spacing:.20em}
+.manual .m-sub{font-size:11.5px;color:#918a7d;letter-spacing:.18em}
+.m-sec-h{font-size:13px;letter-spacing:.16em;font-weight:700}
+.m-sec p{font-size:13.5px;line-height:1.9;color:#b9b1a3;font-weight:400;letter-spacing:.015em}
+.m-row{font-size:13px;line-height:1.75;color:#b0a89a;font-weight:400}
+.ct-card .ctn{font-size:14px}.ct-card .ctl{font-size:11px}
+.dis-card .dn{font-size:14px}.dis-card .dd{font-size:12px;color:#b0a89a}
+
+@media (max-width:1400px){
+  .game{grid-template-columns:270px minmax(672px,1fr) 295px;gap:10px;padding:10px}
+  .panel{padding:12px}
+  .panel-h{font-size:11px}
+}
+@media (max-width:1200px){
+  .game{grid-template-columns:260px 1fr 270px}
+}
+@media (max-width:1100px){
+  .side{position:static;max-height:none;overflow:visible;padding:0;flex-direction:row;flex-wrap:wrap}
+  .side>.panel{min-width:230px}
+  .log{height:180px}
+}
+@media (max-width:560px){
+  html{font-size:14px}
+  .panel{padding:12px}
+  .panel-h{font-size:11px}
+  .turn-name{font-size:17px}
+  .log{height:170px;font-size:11.2px}
+  .tile-tooltip{min-width:205px;max-width:270px;font-size:11px}
+  .manual-box{padding:24px 18px 22px}
+}
+
+
+/* ==================== 第十一版：信息折叠 / 标签页 ==================== */
+.hud-tab-shell{display:flex;flex-direction:column;gap:10px;min-height:0}
+.hud-tabs{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:5px;
+  border:1px solid rgba(212,175,55,.22);border-radius:10px;
+  background:rgba(8,8,14,.82);box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+  position:sticky;top:0;z-index:35;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)
+}
+.hud-tab{
+  position:relative;border:1px solid transparent;border-radius:7px;padding:9px 5px;
+  background:transparent;color:#8f897d;font:700 11.5px/1.2 var(--font-sans);
+  letter-spacing:.08em;cursor:pointer;transition:.2s ease;white-space:nowrap
+}
+.hud-tab span{display:inline-block;margin-right:3px;font-size:11px;opacity:.75}
+.hud-tab:hover{color:#e9dfc0;background:rgba(212,175,55,.07);border-color:rgba(212,175,55,.14)}
+.hud-tab.active{
+  color:#fff0ad;background:linear-gradient(180deg,rgba(212,175,55,.20),rgba(212,175,55,.08));
+  border-color:rgba(240,216,121,.42);box-shadow:0 0 18px -9px rgba(212,175,55,.9),inset 0 1px 0 rgba(255,255,255,.06)
+}
+.hud-tab.has-alert::after{
+  content:"";position:absolute;right:7px;top:6px;width:6px;height:6px;border-radius:50%;
+  background:#ff745f;box-shadow:0 0 9px #ff5b46
+}
+.hud-tab-pane{display:none;flex-direction:column;gap:10px;min-height:0;animation:tabPaneIn .18s ease both}
+.hud-tab-pane.active{display:flex}
+@keyframes tabPaneIn{from{opacity:.25;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+/* 标签页中的次要面板可点标题折叠 */
+.collapsible-panel>.panel-h{cursor:pointer;user-select:none;padding-right:2px;margin-bottom:10px}
+.collapsible-panel>.panel-h::before{
+  content:"▾";display:inline-block;margin-right:6px;color:#9d9271;font-size:10px;
+  transition:transform .2s ease;transform-origin:center
+}
+.collapsible-panel.is-collapsed>.panel-h{margin-bottom:0}
+.collapsible-panel.is-collapsed>.panel-h::before{transform:rotate(-90deg)}
+.collapsible-panel>.panel-body{display:block;max-height:700px;opacity:1;overflow:visible;transition:max-height .28s ease,opacity .2s ease}
+.collapsible-panel.is-collapsed>.panel-body{display:none}
+.panel-h.static-h{cursor:default}
+.panel-h.static-h::before{display:none!important}
+
+/* 标签页后，侧栏只滚动当前分类，减少整栏漫长滚动 */
+.side-left>.turn-panel{flex:0 0 auto}
+.side-left>.hud-tab-shell,.side-right>.hud-tab-shell{min-height:0}
+.side-right .hud-tab-pane>.panel{min-height:0}
+.right-tab-shell .hud-tab-pane[data-tab-pane="unit"] .unit-panel{min-height:360px}
+.right-tab-shell .hud-tab-pane[data-tab-pane="report"] .report-panel{min-height:340px}
+.right-tab-shell .log{height:min(58vh,560px);min-height:300px}
+.tab-tip{margin-top:12px;padding:10px;border-radius:7px;background:rgba(212,175,55,.055);border:1px solid rgba(212,175,55,.13);font-size:11px;line-height:1.65;color:#9f988b}
+
+/* 让激活的系统状态在折叠结构里仍然醒目 */
+.hud-tab-pane .panel{margin:0}
+.hud-tab-pane .disaster-panel.active,.hud-tab-pane .zone-panel.active{border-width:1px}
+.hud-tab-pane .mxy-panel{box-shadow:0 8px 28px -14px rgba(0,0,0,.86),0 0 18px -13px rgba(240,216,121,.8)}
+
+@media (max-width:1100px){
+  .hud-tab-shell{width:100%}
+  .hud-tab-pane.active{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));align-items:start}
+  .hud-tabs{position:static}
+  .right-tab-shell .hud-tab-pane[data-tab-pane="report"] .report-panel,
+  .right-tab-shell .hud-tab-pane[data-tab-pane="unit"] .unit-panel{min-height:0}
+  .right-tab-shell .log{height:240px;min-height:180px}
+}
+
+
+/* ==================== 第十二版：UI 比例审计修复 ====================
+   原则：不是整体缩小字体，而是恢复“容器宽度 / 字号 / 行高 / 断点”的平衡。
+*/
+:root{--ui-readable:11px}
+
+/* 桌面信息密度回调：正文清楚，但不挤爆卡片 */
+.panel{padding:12px}
+.panel-h{font-size:10.8px;letter-spacing:.12em;text-indent:.12em;margin-bottom:10px}
+.turn-name{font-size:17.5px;letter-spacing:.055em}
+.turn-sub{font-size:10.8px;line-height:1.45}
+.turn-count{font-size:11.2px}.turn-count b{font-size:15.5px}
+.res-item{padding:8px 9px;font-size:11.5px}.res-item b{font-size:12px}
+
+/* 功能卡仍保持双列，但压回适合 280px 侧栏的字号 */
+.cards-grid{gap:7px}
+.card{padding:9px 7px;min-width:0}
+.card .c-ico{font-size:19px}
+.card .c-name{font-size:11.2px;line-height:1.35}
+.card .c-desc{font-size:9.8px;line-height:1.55;overflow-wrap:anywhere}
+.card.empty .c-desc{font-size:10px}
+
+.fact{padding:8px 9px;font-size:12px}.fnum{font-size:10.7px}
+.edict,.skill-box{font-size:11.6px;line-height:1.72}
+.edict b{font-size:11.3px}.skill-box b{font-size:12px}
+.zone-info,.disaster-info{font-size:11.2px;line-height:1.68}
+.zone-info .zdur,.disaster-info .ddur{font-size:10.2px}
+.zone-info .zdesc,.disaster-info .ddesc{font-size:11.1px;line-height:1.65}
+.disaster-info .dhead{font-size:12.8px}
+
+/* 临床模块：给正文更多真实宽度，防止状态列把描述挤成两三个字一行 */
+.clinic-partner{padding:8px;grid-template-columns:26px minmax(0,1fr) auto;gap:7px}
+.clinic-partner .cp-ico{width:26px;height:26px;font-size:12px}
+.clinic-partner .cp-name{font-size:11.1px}
+.clinic-partner .cp-desc{font-size:9.8px;line-height:1.48;overflow-wrap:anywhere}
+.clinic-partner .cp-state{font-size:9.6px;white-space:nowrap}
+.clinic-factions span{font-size:9.5px;padding:3px 6px}
+.clinic-last-event{font-size:10px;line-height:1.55}
+
+/* MXY 事件：标题保留识别度，说明回调 */
+.mxy-info{font-size:10.8px;line-height:1.62}
+.mxy-head{padding:8px 9px;min-width:0}
+.mxy-head b{font-size:11.5px;min-width:0}.mxy-head span{font-size:9.8px;white-space:nowrap}
+.mxy-event{padding:7px 8px;margin-top:6px}
+.mxy-event .me-name{font-size:10.8px}.mxy-event .me-desc{font-size:9.8px;line-height:1.48;overflow-wrap:anywhere}
+
+/* 单位面板：信息多，采用中等字号而非全面放大 */
+.unit-info{min-height:220px}
+.ui-avatar{width:46px;height:46px;font-size:20px}
+.ui-name{font-size:15.5px}.ui-sub{font-size:10.7px}
+.ui-bar-lbl{font-size:10px;width:34px}.ui-bar-val{font-size:10.5px;min-width:42px}
+.ui-stats{font-size:11px;gap:6px}.ui-stat{padding:6px 7px}
+.ui-pattern{padding:8px 9px;font-size:11.2px;line-height:1.65}
+.ct-tag{font-size:10.2px;padding:2px 6px}
+.abtn{font-size:11px;padding:8px 5px}.abtn.skill{font-size:11.6px;padding:10px 6px}.abtn.skill small{font-size:9.8px}
+.btn{font-size:12px;padding:10px 8px}
+
+/* 战报可以大，但避免一条消息占太多高度 */
+.log{font-size:11px;line-height:1.68;gap:2px}
+.log div{padding:4px 3px 4
