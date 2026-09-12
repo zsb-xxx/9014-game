@@ -1,0 +1,361 @@
+',
+  round:1,selected:null,moveCells:[],atkCells:[],skillCells:[],
+  skillMode:false,busy:false,over:false,unitSeq:0,
+  gold:{GYC:50,LLY:50,JYM:50,MXY:0},income:{GYC:5,LLY:5,JYM:5,MXY:0},towns:{},
+  disaster:null,pendingDisaster:null,lastDisasterKey:null,
+  bossActive:false,bossDefeated:false,bossTriggered:false,bossKey:null,
+  hand:{GYC:[],LLY:[],JYM:[],MXY:[]},
+  spies:{},spyRevealed:0,
+  scenario:null,
+  clinical:{bonus:{GYC:0,LLY:0,JYM:0},unlocked:{GYC:{},LLY:{},JYM:{}}},
+  battleEvents:{enabled:false,count:0,max:0,lastKey:null,lastText:'本局尚无随机事件'},
+  duel:{chance:0.07,count:0,lastRound:-1,wins:{GYC:0,LLY:0,JYM:0,MXY:0},fights:{GYC:0,LLY:0,JYM:0,MXY:0}},
+  mxy:{enabled:false,spawned:false,defeated:false,won:false,spawnRound:null,events:[],index:0,met:{},observeTicks:0,observeLastRound:-1,balance:{active:false,target:null,damage:0,expiresRound:0},balanceCd:0,lastText:'领主尚未现身'},
+  zyNPC:{x:1,y:ROWS-2,trust:{...ZY_TRUST_START},lastSupportRound:{GYC:-99,LLY:-99,JYM:-99,MXY:-99},lastStats:{},lastText:'ZY 保持中立，正在观察各方行动'},
+  roleProgress:{LLY:0,JYM:0},roleStage:{LLY:false,JYM:false},roleVictory:null,rebelHeads:{LLY:false,JYM:false},rebelEndgame:{active:false,readyRound:null,failed:false},bossRewards:null,
+  shrink:{
+    active:false,
+    colMin:0,colMax:COLS-1,
+    rowMin:0,rowMax:ROWS-1,
+    nextRound:0,
+    totalShrunk:0
+  },
+  stats:{damageDealt:{GYC:0,LLY:0,JYM:0},kills:{GYC:0,LLY:0,JYM:0},
+         unitsLost:{GYC:0,LLY:0,JYM:0},bossDamage:{GYC:0,LLY:0,JYM:0},spyRevealed:0}
+};
+
+/* ==================== DOM ==================== */
+const boardEl=document.getElementById('board');
+const tilesEl=document.getElementById('tiles');
+const tileTooltip=document.createElement('div');
+tileTooltip.className='tile-tooltip';
+document.body.appendChild(tileTooltip);
+const fxEl=document.getElementById('fx');
+const unitsEl=document.getElementById('units');
+const logEl=document.getElementById('log');
+const turnDot=document.getElementById('turnDot');
+const turnName=document.getElementById('turnName');
+const turnSub=document.getElementById('turnSub');
+const turnNum=document.getElementById('turnNum');
+const factList=document.getElementById('factList');
+const edictEl=document.getElementById('edict');
+const skillEl=document.getElementById('factionSkill');
+const resGold=document.getElementById('resGold');
+const resIncome=document.getElementById('resIncome');
+const cardsGrid=document.getElementById('cardsGrid');
+const endTurnBtn=document.getElementById('endTurn');
+const startEl=document.getElementById('start');
+const fcardsEl=document.getElementById('fcards');
+const mainMenuPanel=document.getElementById('mainMenuPanel');
+const factionPanel=document.getElementById('factionPanel');
+const newGameBtn=document.getElementById('newGameBtn');
+const continueBtn=document.getElementById('continueBtn');
+const continueMeta=document.getElementById('continueMeta');
+const factionBackBtn=document.getElementById('factionBackBtn');
+const saveBtn=document.getElementById('saveBtn');
+const menuBtn=document.getElementById('menuBtn');
+const saveToast=document.getElementById('saveToast');
+const tutorialEl=document.getElementById('tutorial');
+const tutorialStepNum=document.getElementById('tutorialStepNum');
+const tutorialTitle=document.getElementById('tutorialTitle');
+const tutorialBody=document.getElementById('tutorialBody');
+const tutorialDemo=document.getElementById('tutorialDemo');
+const tutorialDots=document.getElementById('tutorialDots');
+const tutorialPrev=document.getElementById('tutorialPrev');
+const tutorialNext=document.getElementById('tutorialNext');
+const tutorialSkip=document.getElementById('tutorialSkip');
+const overEl=document.getElementById('over');
+const overBox=document.getElementById('overBox');
+const overEmblem=document.getElementById('overEmblem');
+const overTitle=document.getElementById('overTitle');
+const overSub=document.getElementById('overSub');
+const overStats=document.getElementById('overStats');
+const overExtra=document.getElementById('overExtra');
+const unitInfoEl=document.getElementById('unitInfo');
+const manualEl=document.getElementById('manual');
+const disPanel=document.getElementById('disasterPanel');
+const disInfo=document.getElementById('disasterInfo');
+const disProgress=document.getElementById('disProgress');
+const disProgressBar=document.getElementById('disProgressBar');
+const disFlash=document.getElementById('disFlash');
+const disBanner=document.getElementById('disBanner');
+const dbIco=document.getElementById('dbIco');
+const dbName=document.getElementById('dbName');
+const dbDesc=document.getElementById('dbDesc');
+const bossBar=document.getElementById('bossBar');
+const bossBarName=document.getElementById('bossBarName');
+const bossHpBar=document.getElementById('bossHpBar');
+const bossHpVal=document.getElementById('bossHpVal');
+const zonePanel=document.getElementById('zonePanel');
+const zoneInfo=document.getElementById('zoneInfo');
+const scenarioTag=document.getElementById('scenarioTag');
+const scenarioReveal=document.getElementById('scenarioReveal');
+const srName=document.getElementById('srName');
+const srDesc=document.getElementById('srDesc');
+const clinicalInfo=document.getElementById('clinicalInfo');
+const mxyInfo=document.getElementById('mxyInfo');
+const zyNpcInfo=document.getElementById('zyNpcInfo');
+const zyRequestBtn=document.getElementById('zyRequestBtn');
+const battleEventBanner=document.getElementById('battleEventBanner');
+const battleEventIco=document.getElementById('battleEventIco');
+const battleEventName=document.getElementById('battleEventName');
+const battleEventDesc=document.getElementById('battleEventDesc');
+const duelBanner=document.getElementById('duelBanner');
+const duelFlash=document.getElementById('duelFlash');
+const duelSideA=document.getElementById('duelSideA');
+const duelSideB=document.getElementById('duelSideB');
+const duelNameA=document.getElementById('duelNameA');
+const duelNameB=document.getElementById('duelNameB');
+const duelPowerA=document.getElementById('duelPowerA');
+const duelPowerB=document.getElementById('duelPowerB');
+const duelRollA=document.getElementById('duelRollA');
+const duelRollB=document.getElementById('duelRollB');
+const duelResult=document.getElementById('duelResult');
+
+const unitEls=new Map();
+
+/* ==================== 工具 ==================== */
+const inBoard=(x,y)=>x>=0&&x<COLS&&y>=0&&y<ROWS;
+const onHub=(x,y)=>MAP[y][x]===5;
+const onZY=onHub; // 内部兼容别名
+const terrainAt=(x,y)=>TERRAIN[MAP[y][x]]||TERRAIN[0];
+const isPassableTile=(x,y)=>inBoard(x,y)&&terrainAt(x,y).movCost<99;
+const dist=(a,b)=>Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
+const cheb=(a,b)=>Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y));
+const alive=()=>G.units.filter(u=>u.hp>0);
+const unitAt=(x,y)=>{
+  const hits=G.units.filter(u=>u.hp>0&&u.x===x&&u.y===y);
+  return hits.find(u=>u.isBoss)||hits.find(u=>u.isMXY)||hits[0];
+};
+const tileSize=()=>parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tile'));
+const factionColor=(k)=>FACTIONS[k]?FACTIONS[k].color:(G.bossKey&&BOSSES[G.bossKey]?BOSSES[G.bossKey].color:'#888');
+function tileEffectHtml(x,y){
+  const terr=terrainAt(x,y), t=MAP[y][x];
+  const rows=[];
+  if(terr.movCost>=99)rows.push(['移动','不可通行']);
+  else rows.push(['移动',`消耗 ${terr.movCost} 点移动力`]);
+  if(terr.def!==1)rows.push(['防御',`防御系数 ×${terr.def.toFixed(2)}`]);
+  if(terr.eva>0)rows.push(['闪避',`+${Math.round(terr.eva*100)}%`]);
+  if(terr.atkMod!==1)rows.push(['攻击',`${terr.atkMod>1?'+':''}${Math.round((terr.atkMod-1)*100)}%`]);
+  if(terr.rngMod)rows.push(['射程',`${terr.rngMod>0?'+':''}${terr.rngMod}`]);
+  if(terr.heal>0)rows.push(['驻留回复',`己方回合开始 +${terr.heal} 兵力`]);
+  if(t===4){
+    const owner=G.towns[x+','+y];
+    rows.push(['节点收益','GYC +15 金 / LLY·JYM +18 金']);
+    rows.push(['控制方',owner?factionName(owner):'中立']);
+  }
+  rows.push(['战区',strategicRegionAt(x).name]);
+  if(t===5)rows.push(['战略','9013公共中枢：LLY用于建立开源网络；JYM用于维持跨区暗网控制']);
+  if(t===7){rows.push(['NPC','ZY · 量子隐士']);rows.push(['规则','中立、不可占领、不参加普通回合']);rows.push(['作用','根据各方行为与信任提供有限技术支援']);}
+  const warnings=[];
+  if(G.shrink.active&&!inSafeZone(x,y))warnings.push('☠ 安全区外：结算时损失当前兵力的 50%');
+  if(G.disaster){
+    const k=G.disaster.key;
+    if(k==='fire'&&t===1)warnings.push('🔥 山火：每回合受到 20 伤害');
+    if(k==='flood'){
+      let near=t===3;
+      if(!near){for(const [dx,dy] of DIRS){const nx=x+dx,ny=y+dy;if(inBoard(nx,ny)&&MAP[ny][nx]===3){near=true;break;}}}
+      if(near)warnings.push('🌊 洪水：每回合受到 12 伤害');
+    }
+    if(k==='blizzard'&&t!==5&&t!==7)warnings.push('❄ 暴风雪：每回合 8 伤害，移动力 -1');
+    if(k==='plague')warnings.push('☠ 瘟疫：每回合损失 5% 最大兵力');
+    if(k==='storm')warnings.push('🌪 沙尘暴：射程 -1');
+    if(k==='bloodmoon')warnings.push('💀 血月：攻击 +30%，每回合损失 8% 最大兵力');
+    if(k==='zy-surge'&&t===5)warnings.push('✦ 中枢算力潮汐：每回合 +20 兵力，攻击 +20%');
+  }
+  const occ=unitAt(x,y);
+  if(occ)rows.push(['驻军',`${factionName(occ.faction)} · ${occ.typeName} · ${Math.max(0,occ.hp)}/${occ.maxHp}`]);
+  const rowHtml=rows.map(([k,v])=>`<div class="tt-line"><span class="tt-k">${k}</span><span class="tt-v">${v}</span></div>`).join('');
+  const warnHtml=warnings.length?`<div class="tt-warn">${warnings.join('<br>')}</div>`:'';
+  return `<div class="tt-head"><span class="tt-name">${terr.name}</span><span class="tt-pos">(${x}, ${y})</span></div>${rowHtml}${warnHtml}`;
+}
+function showTileTooltip(el,e){
+  const x=Number(el.dataset.x),y=Number(el.dataset.y);
+  if(!inBoard(x,y))return;
+  tileTooltip.innerHTML=tileEffectHtml(x,y);
+  tileTooltip.classList.add('on');
+  const pad=14, w=260, h=180;
+  let left=e.clientX+14,top=e.clientY+14;
+  if(left+w>window.innerWidth-pad)left=e.clientX-w-14;
+  if(top+h>window.innerHeight-pad)top=Math.max(pad,e.clientY-h-14);
+  tileTooltip.style.left=left+'px';tileTooltip.style.top=top+'px';
+}
+const factionName=(k)=>FACTIONS[k]?FACTIONS[k].name:(G.bossKey&&BOSSES[G.bossKey]?BOSSES[G.bossKey].name:k);
+
+function counterState(a,b){
+  const ta=TYPES[a.type],tb=TYPES[b.type];
+  if(!ta||!tb)return 'norm';
+  if(ta.counter===b.type)return 'adv';
+  if(tb.counter===a.type)return 'dis';
+  return 'norm';
+}
+function inSafeZone(x,y){
+  if(!G.shrink.active) return true;
+  return x >= G.shrink.colMin && x <= G.shrink.colMax &&
+         y >= G.shrink.rowMin && y <= G.shrink.rowMax;
+}
+function isZoneEdge(x,y){
+  if(!G.shrink.active) return false;
+  if(!inSafeZone(x,y)) return false;
+  // 边界格
+  if(x === G.shrink.colMin || x === G.shrink.colMax ||
+     y === G.shrink.rowMin || y === G.shrink.rowMax) return true;
+  return false;
+}
+
+/* ==================== 随机场景系统 ==================== */
+let MAP = [];
+
+function generateMap(){
+  const map = Array.from({length:ROWS}, ()=>Array(COLS).fill(0));
+  hubCells().forEach(([x,y])=>{map[y][x]=5;});
+
+  // 出生区只保护近端，扩大地图后让中场更早出现复杂地形。
+  const protect = [
+    {x0:4,x1:10,y0:8,y1:10},   // GYC
+    {x0:10,x1:14,y0:0,y1:3},   // LLY
+    {x0:0,x1:4,y0:0,y1:3}      // JYM
+  ];
+  const protectedCell=(x,y)=>protect.some(a=>x>=a.x0&&x<=a.x1&&y>=a.y0&&y<=a.y1);
+  const freeTerrain=(x,y)=>inBoard(x,y)&&map[y][x]===0&&!protectedCell(x,y);
+
+  // 一条可穿越的曲折河带，让地图不再只是独立散点。
+  let riverY=3+Math.floor(Math.random()*Math.max(1,ROWS-6));
+  for(let x=0;x<COLS;x++){
+    if(freeTerrain(x,riverY)&&Math.random()<0.78)map[riverY][x]=3;
+    if(Math.random()<0.58){
+      riverY+=Math.floor(Math.random()*3)-1;
+      riverY=Math.max(3,Math.min(ROWS-4,riverY));
+    }
+  }
+
+  // 中高密度基础地形：仍保留足够平原，但移动路线会明显分叉。
+  for(let y=0;y<ROWS;y++){
+    for(let x=0;x<COLS;x++){
+      if(!freeTerrain(x,y))continue;
+      const r=Math.random();
+      if(r<0.10)      map[y][x]=1; // 森林
+      else if(r<0.17) map[y][x]=2; // 山地
+      else if(r<0.27) map[y][x]=6; // 丘陵
+      else if(r<0.31) map[y][x]=4; // 城镇（仍允许整局无节点）
+    }
+  }
+
+  // 追加少量森林/丘陵小片区，使地形具有“区域”而非纯噪点感。
+  const patchTypes=[1,1,6,6];
+  for(let p=0;p<4;p++){
+    const cx=2+Math.floor(Math.random()*(COLS-4));
+    const cy=2+Math.floor(Math.random()*(ROWS-4));
+    const type=patchTypes[p];
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      const x=cx+dx,y=cy+dy;
+      if(freeTerrain(x,y)&&Math.random()<0.48)map[y][x]=type;
+    }
+  }
+  // ZY 的独立实验室固定在边缘山地，不属于任何阵营，也不允许普通单位进入。
+  const [zx,zy]=zyLabPos();map[zy][zx]=7;
+  for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=zx+dx,ny=zy+dy;if(inBoard(nx,ny)&&map[ny][nx]===0)map[ny][nx]=6;}
+  if(G.zyNPC){G.zyNPC.x=zx;G.zyNPC.y=zy;}
+  return map;
+}
+
+function rollScenario(){
+  const hasBoss = Math.random() < 0.35;
+  const hasShrink = Math.random() < 0.45;
+  const hasDisaster = Math.random() < 0.65;
+
+  // 计算场景名
+  const parts = [];
+  if(hasShrink) parts.push('收 圈');
+  if(hasBoss) parts.push('灾 主');
+  if(hasDisaster) parts.push('天 灾');
+
+  const name = parts.length ? parts.join(' · ') : '三 分 稳 局';
+  const descs = [];
+  if(hasShrink) descs.push('第 5 回合起，每 2 回合收缩安全区');
+  if(hasBoss) descs.push('第 5 回合起，BOSS 可能降临');
+  if(hasDisaster) descs.push('天灾频繁，需谨慎布阵');
+  if(!descs.length) descs.push('风平浪静，纯粹的派系博弈');
+
+  return {
+    hasBoss, hasShrink, hasDisaster,
+    bossBaseChance: 0.08,
+    bossGrowth: 0.04,
+    bossMaxChance: 0.30,
+    bossStartRound: 5,
+    disasterRate: hasDisaster ? (0.20 + Math.random()*0.15) : 0.05,
+    shrinkStartRound: 5,
+    shrinkInterval: 2,
+    spyBaseRate: 0.10 + Math.random()*0.10,
+    name, desc: descs.join('；')
+  };
+}
+
+/* ==================== 临床伙伴 / 随机事件 ==================== */
+function clinicalScore(fac){
+  if(!G.clinical) return 0;
+  const towns=Object.values(G.towns||{}).filter(x=>x===fac).length;
+  const st=G.stats||{};
+  const dmg=(st.damageDealt&&st.damageDealt[fac])||0;
+  const kills=(st.kills&&st.kills[fac])||0;
+  const boss=(st.bossDamage&&st.bossDamage[fac])||0;
+  const bonus=(G.clinical.bonus&&G.clinical.bonus[fac])||0;
+  return Math.max(0,Math.floor((G.round-1)*10 + dmg/18 + kills*25 + towns*20 + boss/15 + bonus));
+}
+
+function findClinicalSpawn(fac){
+  const lord=G.units.find(u=>u.faction===fac&&u.hp>0&&u.type==='lord');
+  const dep=DEPLOY[fac]&&DEPLOY[fac][0];
+  const ax=lord?lord.x:(dep?dep[1]:Math.floor(COLS/2));
+  const ay=lord?lord.y:(dep?dep[2]:Math.floor(ROWS/2));
+  for(let r=1;r<=Math.max(COLS,ROWS);r++){
+    for(let y=Math.max(0,ay-r);y<=Math.min(ROWS-1,ay+r);y++){
+      for(let x=Math.max(0,ax-r);x<=Math.min(COLS-1,ax+r);x++){
+        if(Math.max(Math.abs(x-ax),Math.abs(y-ay))!==r)continue;
+        if(!isPassableTile(x,y)||unitAt(x,y))continue;
+        if(G.shrink.active&&!inSafeZone(x,y))continue;
+        return [x,y];
+      }
+    }
+  }
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    if(isPassableTile(x,y)&&!unitAt(x,y))return [x,y];
+  }
+  return null;
+}
+
+function spawnClinicalPartner(fac,p){
+  const pos=findClinicalSpawn(fac);
+  if(!pos)return false;
+  const t=TYPES[p.type];
+  const u={
+    id:'c'+(G.unitSeq++),faction:fac,type:p.type,clinicalKey:p.key,isClinical:true,
+    short:t.short,typeName:t.name,x:pos[0],y:pos[1],
+    hp:t.hp,maxHp:t.hp,atk:t.atk,mov:t.mov,
+    moved:false,acted:false,buff:1,movBonus:0,shield:0,
+    energy:50,level:1,exp:0,skillCd:0,
+    rageBuff:false,flagBuff:false,shieldWall:false,zyBuff:false,slow:false,invisible:false
+  };
+  G.units.push(u);
+  log(`✚ <b style="color:${factionColor(fac)}">${factionName(fac)}</b> 解锁临床伙伴 <b>${p.name}</b>，已进入战场支援`,'ally');
+  slashAt(u.x,u.y,'skill');
+  return true;
+}
+
+function checkClinicalUnlocks(fac){
+  if(!G.clinical||!G.clinical.unlocked[fac])return;
+  const score=clinicalScore(fac);
+  CLINICAL_PARTNERS.forEach(p=>{
+    if(score<p.threshold||G.clinical.unlocked[fac][p.key])return;
+    if(spawnClinicalPartner(fac,p))G.clinical.unlocked[fac][p.key]=true;
+  });
+}
+
+function applyClinicalSupport(fac){
+  const active=G.units.filter(u=>u.faction===fac&&u.hp>0&&u.isClinical);
+  if(!active.length)return;
+  const allies=()=>G.units.filter(u=>u.faction===fac&&u.hp>0);
+  if(active.some(u=>u.clinicalKey==='clinician')){
+    const targets=allies().filter(u=>u.hp<u.maxHp).sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp).slice(0,2);
+    targets.forEach(u=>{const h=Math.min(18,u.maxHp-u.hp);u.hp+=h;float(u,h,'heal');});
+    if(targets.length)log(`✚ ${factionName(fac)} · 住院医师完成战地查房，
