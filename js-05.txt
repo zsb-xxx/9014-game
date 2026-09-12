@@ -1,0 +1,387 @@
+'di-fire');
+    if(key==='flood'){
+      let nearRiver=MAP[y][x]===3;
+      if(!nearRiver){for(const [dx,dy] of DIRS){const nx=x+dx,ny=y+dy;if(inBoard(nx,ny)&&MAP[ny][nx]===3){nearRiver=true;break;}}}
+      if(nearRiver)el.classList.add('di-flood');
+    }
+    if(key==='blizzard'&&!onZY(x,y))el.classList.add('di-blizzard');
+    if(key==='plague')el.classList.add('di-plague');
+    if(key==='zy-surge'&&onZY(x,y))el.classList.add('di-zy-surge');
+    if(key==='storm')el.classList.add('di-storm');
+  });
+  boardEl.classList.toggle('di-dark',key==='storm'||key==='bloodmoon'||key==='plague');
+}
+function refreshTiles(){
+  tilesEl.querySelectorAll('.tile.town').forEach(el=>{
+    el.classList.remove('ownedGYC','ownedLLY','ownedJYM');
+    const k=el.dataset.x+','+el.dataset.y;
+    if(G.towns[k])el.classList.add('owned'+G.towns[k]);
+  });
+}
+function buildUnits(){
+  G.units=[];G.unitSeq=0;G.spies={};
+  Object.keys(DEPLOY).forEach(fac=>{
+    DEPLOY[fac].forEach(([type,x,y])=>{
+      const t=TYPES[type];
+      const u={
+        id:'u'+(G.unitSeq++),faction:fac,type,
+        short:t.short,typeName:t.name,x,y,
+        hp:t.hp,maxHp:t.hp,atk:t.atk,mov:t.mov,
+        moved:false,acted:false,buff:1,movBonus:0,shield:0,
+        energy:50,level:1,exp:0,skillCd:0,
+        rageBuff:false,flagBuff:false,shieldWall:false,zyBuff:false,slow:false
+      };
+      G.units.push(u);
+    });
+  });
+  const facs=['GYC','LLY','JYM'];
+  facs.forEach(fac=>{
+    const ownUnits=G.units.filter(u=>u.faction===fac&&u.type!=='lord');
+    if(!ownUnits.length)return;
+    const spy=ownUnits[Math.floor(Math.random()*ownUnits.length)];
+    const others=facs.filter(f=>f!==fac);
+    const realFac=others[Math.floor(Math.random()*others.length)];
+    G.spies[spy.id]={realFaction:realFac};
+  });
+}
+function fitBoard(){
+  const wrap=document.querySelector('.board-wrap');
+  const availW=wrap.clientWidth-8;
+  const availH=window.innerHeight*0.68;
+  const t=Math.floor(Math.min(availW/COLS,availH/ROWS));
+  document.documentElement.style.setProperty('--tile',Math.max(26,Math.min(t,62))+'px');
+  renderUnits();renderHighlights();
+}
+
+/* ==================== 渲染 ==================== */
+function renderUnits(){
+  const tile=tileSize();
+  const seen=new Set();
+  G.units.forEach(u=>{
+    if(u.hp<=0){
+      const el=unitEls.get(u.id);
+      if(el){el.classList.add('dead');setTimeout(()=>el.remove(),420);unitEls.delete(u.id);}
+      return;
+    }
+    seen.add(u.id);
+    let el=unitEls.get(u.id);
+    if(!el){
+      el=document.createElement('div');
+      el.className='unit';
+      el.innerHTML=`<div class="u-shield"></div><div class="u-cd"></div><div class="u-lv"></div>
+        <div class="u-body"><span></span></div><div class="u-hp"><i></i></div><div class="u-en"><i></i></div>`;
+      unitsEl.appendChild(el);unitEls.set(u.id,el);
+    }
+    const f=FACTIONS[u.faction];
+    const color = f ? f.color : (G.bossKey?BOSSES[G.bossKey].color:'#ff2a4a');
+    el.style.setProperty('--c',color);
+    if(u.isBoss && G.bossKey) el.style.setProperty('--bc',BOSSES[G.bossKey].color);
+    el.style.left=(u.x*tile)+'px';el.style.top=(u.y*tile)+'px';
+    el.querySelector('.u-body span').textContent=u.short;
+    const pct=Math.max(0,u.hp/u.maxHp*100);
+    const bar=el.querySelector('.u-hp i');
+    bar.style.width=pct+'%';
+    bar.className=pct<28?'crit':pct<58?'low':'';
+    const enBar=el.querySelector('.u-en i');
+    enBar.style.width=u.energy+'%';
+    enBar.className=u.energy>=100?'full':'';
+    el.classList.toggle('acted',u.acted);
+    el.classList.toggle('selected',G.selected===u);
+    el.classList.toggle('aura',u.type==='lord'&&u.hp>0);
+    el.classList.toggle('rage',isRaging(u)||u.rageBuff);
+    const sk=SKILLS[u.type];
+    el.classList.toggle('energized',!!(sk&&u.energy>=sk.cost&&u.skillCd===0));
+    el.classList.toggle('boss-unit',!!u.isBoss);
+    el.classList.toggle('minion-unit',!!u.isMinion);
+    el.classList.toggle('clinical-unit',!!u.isClinical);
+    el.classList.toggle('mxy-unit',!!u.isMXY);
+    el.classList.toggle('envoy',!!(u.isMXY&&u.envoy));
+    el.classList.toggle('balance-target',!!(G.mxy&&G.mxy.balance&&G.mxy.balance.active&&u.faction===G.mxy.balance.target&&MAJOR_FACTIONS.includes(u.faction)));
+    el.classList.toggle('spy-revealed',!!u.spyRevealed);
+    el.querySelector('.u-shield').classList.toggle('on',u.shield>0);
+    const lvEl=el.querySelector('.u-lv');
+    lvEl.classList.toggle('on',u.level>1);lvEl.textContent='Lv'+u.level;
+    const cdEl=el.querySelector('.u-cd');
+    cdEl.classList.toggle('on',u.skillCd>0);cdEl.textContent='CD'+u.skillCd;
+  });
+  unitEls.forEach((el,id)=>{if(!seen.has(id)){el.remove();unitEls.delete(id);}});
+  renderZYMarker();
+}
+
+function renderHighlights(){
+  fxEl.innerHTML='';
+  const tile=tileSize();
+  if(G.skillMode&&G.selected){
+    const u=G.selected;
+    G.skillCells.forEach(([x,y])=>{
+      const d=document.createElement('div');
+      d.className='hl skill';
+      const tgt=unitAt(x,y);
+      if(tgt){
+        if(u.type==='lord'&&tgt.faction===u.faction)d.classList.add('has-target');
+        if(u.type==='sage'&&tgt.faction!==u.faction)d.classList.add('has-target');
+      }
+      d.style.left=(x*tile)+'px';d.style.top=(y*tile)+'px';
+      fxEl.appendChild(d);
+    });
+    return;
+  }
+  G.moveCells.forEach(([x,y])=>{
+    const d=document.createElement('div');
+    d.className='hl move';
+    d.style.left=(x*tile)+'px';d.style.top=(y*tile)+'px';
+    fxEl.appendChild(d);
+  });
+  const rage=G.selected&&(isRaging(G.selected)||G.selected.rageBuff);
+  G.atkCells.forEach(([x,y])=>{
+    const d=document.createElement('div');
+    d.className='hl atk'+(rage?' rage':'')+(!inSafeZone(x,y)?' out-zone':'');
+    d.style.left=(x*tile)+'px';d.style.top=(y*tile)+'px';
+    fxEl.appendChild(d);
+  });
+}
+
+function renderCards(){
+  if(G.player==='MXY'){cardsGrid.innerHTML=`<div class="card empty" style="grid-column:span 2"><div class="c-desc">领 主 不 使 用 功 能 卡</div></div>`;return;}
+  const hand=G.hand[G.player]||[];
+  if(!hand.length){
+    cardsGrid.innerHTML=`<div class="card empty" style="grid-column:span 2">
+      <div class="c-desc">尚 无 手 牌</div></div>`;
+    return;
+  }
+  cardsGrid.innerHTML=hand.map((c,i)=>{
+    const u=G.selected;
+    let usable=true;
+    if(c.target==='unit') usable = !!(u && u.faction===G.player);
+    return `<div class="card ${usable?'':'disabled'}" data-i="${i}" style="--c:${c.color}" title="${c.desc}">
+      <div class="c-ico">${c.icon}</div>
+      <div class="c-name">${c.name}</div>
+      <div class="c-desc">${c.desc}</div>
+    </div>`;
+  }).join('');
+  cardsGrid.querySelectorAll('.card:not(.empty)').forEach(el=>{
+    el.addEventListener('click',()=>useCard(parseInt(el.dataset.i)));
+  });
+}
+
+function victoryStatusText(fac){
+  if(fac==='GYC'){
+    const heads=(G.rebelHeads?.LLY?1:0)+(G.rebelHeads?.JYM?1:0);
+    if(G.rebelEndgame?.failed)return `特殊胜利：收网节点 ${heads}/2 · 终局已被阻止`;
+    if(G.rebelEndgame?.active)return `特殊胜利：收网时刻 · 守住统帅至第 ${G.rebelEndgame.readyRound} 回合`;
+    return `特殊胜利：亲自击破核心 ${heads}/2`;
+  }
+  if(fac==='LLY'){
+    const townExists=mapHasTown(),hasTown=Object.values(G.towns||{}).some(v=>v==='LLY');
+    const zy=G.units.filter(u=>u.hp>0&&u.faction==='LLY'&&PRINCE_CORE_TYPES.has(u.type)&&onZY(u.x,u.y)).length;
+    return `开源网络：国库 ${G.gold.LLY||0}/${LLY_TREASURY_GOLD} · ${townExists?(hasTown?'节点✓':'节点×'):'无节点'} · 中枢 ${zy}/${LLY_ZY_UNITS} · 守势 ${G.roleProgress.LLY||0}/${LLY_HOLD_TURNS}`;
+  }
+  if(fac==='JYM'){
+    const regs=jymControlledRegions();
+    const zy=G.units.filter(u=>u.hp>0&&u.faction==='JYM'&&PRINCE_CORE_TYPES.has(u.type)&&onZY(u.x,u.y)).length;
+    return `暗网织局：战区 ${regs.length}/2${regs.length?'（'+regs.map(r=>r.name).join(' / ')+'）':''} · 中枢 ${zy}/${JYM_ZY_UNITS} · 守势 ${G.roleProgress.JYM||0}/${JYM_HOLD_TURNS}`;
+  }
+  if(fac==='MXY')return `权谋链：${Math.min((G.mxy?.index||0)+1,4)}/4 · ${currentMXYEvent()?.name||'已完成'}`;
+  return '';
+}
+
+function renderHUD(){
+  const f=FACTIONS[G.current];
+  turnDot.style.setProperty('--c',f.color);
+  turnName.style.setProperty('--c',f.color);
+  turnName.textContent=f.name;
+  turnSub.textContent=G.busy?'行动中…':(G.current===G.player?'你的回合':f.label+' · 敌军');
+  turnNum.textContent=G.round;
+
+  const listHtml = G.order.map(k=>{
+    const ff=FACTIONS[k];
+    const units=G.units.filter(u=>u.faction===k);
+    const n=units.filter(u=>u.hp>0).length;
+    const total=units.length||1;
+    return `<div class="fact ${k===G.current?'cur':''} ${n===0?'dead':''}" style="--c:${ff.color}">
+      <span class="fdot"></span><span class="fname">${ff.name}</span>
+      <span class="fnum">${n}/${total}</span></div>`;
+  }).join('');
+
+  let mxyHtml='';
+  if(G.mxy&&G.mxy.spawned&&!G.order.includes('MXY')){
+    const m=mxyAlive(),mf=FACTIONS.MXY;
+    mxyHtml=`<div class="fact ${m?'':'dead'}" style="--c:${mf.color}"><span class="fdot"></span><span class="fname">MXY · 领主</span><span class="fnum">${m?'事件 '+Math.min(G.mxy.index+1,4)+'/4':'退场'}</span></div>`;
+  }
+
+  let bossHtml='';
+  if(G.bossActive || G.bossDefeated){
+    const bossUnits=G.units.filter(u=>u.isBoss||u.isMinion);
+    const bossAlive=bossUnits.filter(u=>u.hp>0).length;
+    const bossTotal=bossUnits.length||1;
+    const bc = G.bossKey?BOSSES[G.bossKey].color:'#ff2a4a';
+    const bn = G.bossKey?BOSSES[G.bossKey].name:'BOSS';
+    bossHtml = `<div class="fact boss-fact ${bossAlive===0?'dead':''}" style="--c:${bc}">
+      <span class="fdot"></span><span class="fname">${bn}</span>
+      <span class="fnum">${bossAlive}/${bossTotal}</span></div>`;
+  }
+  factList.innerHTML = listHtml + mxyHtml + bossHtml;
+
+  skillEl.style.setProperty('--c',f.color);
+  skillEl.innerHTML=`<b>${f.skill.icon} ${f.skill.name}</b>${f.skill.desc}<div style="margin-top:7px;padding-top:7px;border-top:1px dashed color-mix(in srgb,var(--c) 28%,transparent);font-size:10px;line-height:1.55;color:#c9bea0">${victoryStatusText(G.current)}</div>`;
+  resGold.textContent=G.gold[G.player];
+  resIncome.textContent='+'+G.income[G.player];
+  endTurnBtn.disabled=G.busy||G.over||G.current!==G.player;
+  renderScenarioTag();
+  renderZonePanel();
+  renderDisasterPanel();
+  renderBossBar();
+  renderCards();
+  renderClinicalPanel();
+  renderMXYPanel();
+  renderZYInfo();
+  renderUnitInfo();
+  scheduleAutosave();
+}
+
+function renderScenarioTag(){
+  scenarioTag.textContent='战 局 未 明';
+  scenarioTag.classList.remove('danger');
+}
+
+function renderZonePanel(){
+  if(!G.shrink.active){
+    zonePanel.classList.remove('active');
+    zoneInfo.classList.add('calm');
+    zoneInfo.innerHTML=`<div class="zdesc">本局无收圈机制</div>`;
+    return;
+  }
+  zonePanel.classList.add('active');
+  zoneInfo.classList.remove('calm');
+  const w = G.shrink.colMax - G.shrink.colMin + 1;
+  const h = G.shrink.rowMax - G.shrink.rowMin + 1;
+  const roundsToNext = G.shrink.nextRound - G.round;
+  const nextInfo = roundsToNext > 0
+    ? `下 次 收 缩：${roundsToNext} 回 合 后`
+    : (G.current === G.player ? '本 回 合 结 束 后 收 缩' : '正 在 收 缩 中');
+  zoneInfo.innerHTML=`
+    <div class="zgrid">区 域 ${w} × ${h} 格</div>
+    <div class="zdur">${nextInfo}</div>
+    <div class="zdesc">圈外每回合损失当前兵力 50%</div>`;
+}
+
+function renderBossBar(){
+  const boss=G.units.find(u=>u.isBoss&&u.hp>0);
+  if(boss && G.bossKey){
+    const b=BOSSES[G.bossKey];
+    bossBar.style.setProperty('--bc',b.color);
+    const phase=Math.max(boss.phase||1,bossPhaseFromHp(boss));
+    bossBarName.textContent=`${b.icon} ${b.name} · ${b.title} · ${bossPhaseLabel(phase)}`;
+    bossBar.classList.add('on');
+    bossBar.classList.toggle('final',phase>=3);
+    const pct=Math.max(0,boss.hp/boss.maxHp*100);
+    bossHpBar.style.width=pct+'%';
+    bossHpVal.textContent=`${Math.max(0,boss.hp)} / ${boss.maxHp} · ATK ${bossEffectiveAtk(boss)} · 战斗减伤 20%`;
+  } else {
+    bossBar.classList.remove('on','final');
+  }
+}
+
+function renderDisasterPanel(){
+  if(G.disaster){
+    const d=DISASTERS.find(x=>x.key===G.disaster.key);
+    disPanel.classList.add('active');
+    disPanel.style.setProperty('--dc',d.color);
+    disInfo.classList.remove('calm');
+    disInfo.innerHTML=`
+      <div class="dhead"><span class="di">${d.icon}</span>${d.name}</div>
+      <div class="ddur">剩余 ${G.disaster.roundsLeft} 回合</div>
+      <div class="ddesc">${d.desc}</div>`;
+    disProgress.style.display='block';
+    disProgressBar.style.width=Math.round((G.disaster.roundsLeft/d.duration)*100)+'%';
+    disProgressBar.style.setProperty('--dc',d.color);
+  } else if(G.pendingDisaster){
+    const d=DISASTERS.find(x=>x.key===G.pendingDisaster);
+    disPanel.classList.add('active');
+    disPanel.style.setProperty('--dc',d.color);
+    disInfo.classList.remove('calm');
+    disInfo.innerHTML=`
+      <div class="dhead"><span class="di">⚠️</span>天象预警</div>
+      <div class="ddur">下回合降临</div>
+      <div class="ddesc">${d.icon} ${d.name} · ${d.desc}</div>`;
+    disProgress.style.display='block';
+    disProgressBar.style.width='100%';
+    disProgressBar.style.setProperty('--dc',d.color);
+  } else {
+    disPanel.classList.remove('active');
+    disPanel.style.setProperty('--dc','#666');
+    disInfo.classList.add('calm');
+    disInfo.innerHTML=`
+      <div class="dhead">☀ 天 象 平 稳</div>
+      <div class="ddesc">暂无灾害，但乌云正在汇聚……</div>`;
+    disProgress.style.display='none';
+  }
+}
+
+function renderUnitInfo(){
+  const u=G.selected;
+  if(!u){
+    unitInfoEl.innerHTML=`<div class="ui-empty">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+        <circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/>
+      </svg>点击单位查看情报</div>`;
+    return;
+  }
+  const f=FACTIONS[u.faction];
+  const color = f ? f.color : (G.bossKey?BOSSES[G.bossKey].color:'#ff2a4a');
+  const fname = f ? f.name : (G.bossKey?BOSSES[G.bossKey].name:'BOSS');
+  const flabel = f ? f.label : (u.isBoss?'BOSS':u.isMinion?'傀儡':'');
+  const t=TYPES[u.type];
+  const sk=SKILLS[u.type];
+  const pct=Math.max(0,u.hp/u.maxHp*100);
+  const cls=pct<28?'crit':pct<58?'low':'';
+  const rage=isRaging(u);
+  const atkNow=calcAtk(u);
+  const movNow=calcMov(u);
+  const rngNow=calcRange(u);
+  const terr=terrainAt(u.x,u.y);
+  const canSkill=canUseSkill(u);
+  const expIdx=Math.min(u.level,LEVEL_EXP.length-1);
+  const expNeed=LEVEL_EXP[expIdx]-LEVEL_EXP[Math.min(u.level-1,LEVEL_EXP.length-1)];
+  const expHave=u.exp-LEVEL_EXP[Math.min(u.level-1,LEVEL_EXP.length-1)];
+
+  const ctTags=['lord','brave','sage','guard'].map(tt=>{
+    const st=counterState(u,{type:tt});
+    const nm=TYPES[tt].name;
+    const cls2=st==='adv'?'ct-adv':st==='dis'?'ct-dis':'';
+    const ico=st==='adv'?'▲':st==='dis'?'▼':'—';
+    return `<span class="ct-tag ${cls2}">${ico} ${nm}</span>`;
+  }).join('');
+
+  const canUpgrade=G.gold[G.player]>=50&&u.faction===G.player&&u.level<6&&!u.isBoss&&!u.isMXY;
+  const canHeal=G.gold[G.player]>=30&&u.faction===G.player&&u.hp<u.maxHp&&!u.isBoss&&!u.isMXY;
+  const balanceState=u.isMXY?mxyBalanceStatus(u):null;
+  const balanceCan=!!(u.isMXY&&u.faction===G.player&&balanceState&&balanceState.ok&&!u.acted);
+
+  let spyTag='';
+  if(u.spyRevealed){
+    spyTag = `<div class="ui-pattern" style="--c:#ff2a4a;background:rgba(255,42,74,.12);border-color:rgba(255,42,74,.5)">
+      <b>👁 卧 底</b> · 已暴露身份
+    </div>`;
+  }
+  let zoneTag='';
+  if(G.shrink.active && !inSafeZone(u.x, u.y)){
+    zoneTag = `<div class="ui-pattern" style="--c:#ff5b3a;background:rgba(255,60,30,.15);border-color:rgba(255,80,40,.5)">
+      <b>☠ 安全区外</b> · 每回合损失当前兵力 50%！
+    </div>`;
+  }
+
+  unitInfoEl.innerHTML=`
+    <div class="ui-head">
+      <div class="ui-avatar" style="--c:${color}">${t.icon}<span class="ui-lv">Lv${u.level}</span></div>
+      <div>
+        <div class="ui-name">${t.name}</div>
+        <div class="ui-sub" style="color:${color}">${fname} · ${flabel} · ${terr.name}</div>
+      </div>
+    </div>
+    <div class="ui-bars">
+      <div class="ui-bar-row"><span class="ui-bar-lbl">兵力</span>
+        <div class="ui-bar hp"><i class="${cls}" style="width:${pct}%"></i></div>
+        <span class="ui-bar-val">${u.hp}/${u.maxHp}</span></div>
+      <div class="ui-bar-row"><span class="ui-bar-lbl">能量</span>
+        
