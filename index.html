@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>9014 · 战棋 · v0.9 Public Playtest</title>
+<title>9014 · 战棋 · v0.9.1 Public Playtest</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
     document.body.innerHTML=`<div style="min-height:100vh;background:#06060a;color:#eee;display:flex;align-items:center;justify-content:center;padding:28px;font-family:sans-serif"><div style="max-width:720px"><h2 style="color:#d4af37">9014 · 战棋载入失败</h2><p style="line-height:1.8">${String(msg).replace(/[<>]/g,'')}</p><p style="color:#999;line-height:1.7">请尝试强制刷新（Ctrl+F5），若仍失败请将此提示截图反馈到 GitHub Issue。</p></div></div>`;
   };
   const fetchText=async f=>{
-    const r=await fetch(f+'?v=0901',{cache:'no-store'});
+    const r=await fetch(f+'?v=091',{cache:'no-store'});
     if(!r.ok)throw new Error(`${f} 加载失败（HTTP ${r.status}）`);
     return r.text();
   };
@@ -31,13 +31,16 @@
     ]);
 
     const css=cssParts.join('');
-    const body=bodyParts.join('');
+    let body=bodyParts.join('');
+    body=body
+      .replace('不同身份拥有不同的资源、战术与特殊胜利路线','不同身份拥有不同的资源、战术与专属终局目标；歼灭对手不再直接获胜')
+      .replace('确认自己的特殊胜利目标 → 点击己方单位 → 移动/攻击/技能 → 结束回合','确认自己的专属终局目标 → 点击己方单位 → 移动/攻击/技能 → 结束回合')
+      .replace('GYC、LLY、JYM 参与常规争霸并拥有不同的身份胜利捷径；MXY 的代号为<b>「领主」</b>，不占一城一池，以会盟、观势、制衡与最终裁局完成权谋胜利。若玩家未选择 MXY，领主仍可能在战局中作为独立特殊棋子现身。','GYC、LLY、JYM 与 MXY 都拥有各自独立的终局条件。<b>从本版起，“把其他势力全部消灭”只会形成军事优势，不会自动获胜</b>；玩家仍需完成所选身份的专属终局。MXY 的代号为<b>「领主」</b>，不占一城一池，以会盟、观势、制衡与最终裁局完成权谋胜利。若玩家未选择 MXY，领主仍可能在战局中作为独立特殊棋子现身。')
+      .replace('♜ 身 份 胜 利 机 制','♜ 身 份 专 属 终 局')
+      .replace('身份捷径在 BOSS 联合讨伐期间暂停，击败 BOSS 仍是共同目标。','<b>军事歼灭不是通用胜利条件。</b>身份终局在 BOSS 联合讨伐期间暂停；击败 BOSS 后恢复原终局进度。')
+      .replace('若本局启用，第 5 回合起 BOSS 可能降临，降临后三方转为联合讨伐','BOSS 属于隐藏战局事件，并非每局必有；若本局启用，第 5 回合起进入高概率降临窗口，并设置最迟触发回合，降临后三方暂时转为联合讨伐')
+      .replace('当本局启用 BOSS 规则时，从第 <b>5 回合</b> 起 BOSS 可能降临。','BOSS 属于<b>隐藏战局事件</b>，不是每局必定出现。若本局启用，从第 <b>5 回合</b> 起进入降临窗口，并设有最迟触发回合，避免长局始终遇不到 BOSS。');
 
-    /*
-      公开版曾经把单文件源码拆在函数中间；其中两个历史分片上传时被错误补成了旧版完整函数，
-      与下一分片的“半个函数”重复，导致整个 JS 语法失败、页面可见但按钮无响应。
-      这里在加载时明确重建这两个跨分片函数，避免再次依赖脆弱的字节级拼接。
-    */
     const currentMxyTarget=`function mxyTarget(m,ev){
   const cells=[];
   if(ev&&ev.key==='meet'){const reps=MAJOR_FACTIONS.filter(f=>!G.mxy.met[f]).map(f=>mxyRepresentative(f)).filter(Boolean);if(reps.length){const t=reps.sort((a,b)=>dist(m,a)-dist(m,b))[0];return [t.x,t.y];}}
@@ -56,97 +59,90 @@
 
     const currentSpawnBoss=`function spawnBoss(){
   if(G.bossActive||G.bossDefeated)return;
-  G.bossActive=true;
-  G.bossTriggered=true;
-  const keys=Object.keys(BOSSES);
-  const key=keys[Math.floor(Math.random()*keys.length)];
-  G.bossKey=key;
-  const b=BOSSES[key];
-
-  const bossZY=zyCells();
-  clearSelection();
-  const evicted=evictBossZone(bossZY);
+  G.bossActive=true;G.bossTriggered=true;
+  const keys=Object.keys(BOSSES),key=keys[Math.floor(Math.random()*keys.length)];G.bossKey=key;const b=BOSSES[key];
+  const bossZY=zyCells();clearSelection();const evicted=evictBossZone(bossZY);
   if(evicted)log(\`⚠ BOSS 降临区域已清场，\${evicted} 名单位被强制转移至外围空位。\`,'boss');
-
   const lateRounds=Math.max(0,G.round-(G.scenario?.bossStartRound||5));
-  const hpMul=1+BOSS_RULES.hpGrowthPerRound*lateRounds;
-  const atkMul=1+BOSS_RULES.atkGrowthPerRound*lateRounds;
-  const scaledHp=Math.round(b.hp*hpMul);
-  const scaledAtk=Math.round(b.atk*atkMul);
-  const boss={
-    id:'boss_'+key,faction:key,type:'boss',
-    short:b.icon,typeName:b.title,
-    x:bossZY[0][0],y:bossZY[0][1],
-    hp:scaledHp,maxHp:scaledHp,atk:scaledAtk,mov:b.mov,
-    moved:false,acted:false,buff:1,movBonus:0,shield:0,
-    energy:0,level:1,exp:0,skillCd:0,
-    rageBuff:false,flagBuff:false,shieldWall:false,zyBuff:false,
-    invisibleChance:0.5,
-    isBoss:true,phase:1,spawnRound:G.round,lateRounds
-  };
-  G.units.push(boss);
-
-  boardEl.classList.add('boss-zone');
-  boardEl.classList.add('shake-d');
-  setTimeout(()=>boardEl.classList.remove('shake-d'),650);
-
+  const scaledHp=Math.round(b.hp*(1+BOSS_RULES.hpGrowthPerRound*lateRounds));
+  const scaledAtk=Math.round(b.atk*(1+BOSS_RULES.atkGrowthPerRound*lateRounds));
+  const boss={id:'boss_'+key,faction:key,type:'boss',short:b.icon,typeName:b.title,x:bossZY[0][0],y:bossZY[0][1],hp:scaledHp,maxHp:scaledHp,atk:scaledAtk,mov:b.mov,moved:false,acted:false,buff:1,movBonus:0,shield:0,energy:0,level:1,exp:0,skillCd:0,rageBuff:false,flagBuff:false,shieldWall:false,zyBuff:false,invisibleChance:0.5,isBoss:true,phase:1,spawnRound:G.round,lateRounds};
+  G.units.push(boss);boardEl.classList.add('boss-zone','shake-d');setTimeout(()=>boardEl.classList.remove('shake-d'),650);
   announceBoss(b);
   log(\`【\${b.name} 降临】<b style="color:\${b.color}">\${b.icon} \${b.title} · \${b.name}</b> 撕裂空间而至！\`,'boss');
   log(\`BOSS 实际战力：<b>\${scaledHp} HP / \${scaledAtk} ATK</b>\${lateRounds?\`（晚降临 \${lateRounds} 回合，已动态强化）\`:''} · 战斗伤害减免 20%\`,'boss');
-  log(\`<b style="color:#ffd166">⚠ 胜利目标变更：击败 \${b.name}！三方停火，联手抗灾！</b>\`,'ally');
-
-  setTimeout(()=>{
-    Object.keys(G.spies).forEach(uid=>{
-      if(Math.random()<0.4) revealSpy(uid);
-    });
-  },1200);
-
-  renderUnits();
-  renderHUD();
-  refreshTiles();
+  log(\`<b style="color:#ffd166">⚠ 共同危机：\${b.name} 降临！三方暂时停火，优先联合讨伐；击败后恢复各自终局目标。</b>\`,'ally');
+  setTimeout(()=>{Object.keys(G.spies).forEach(uid=>{if(Math.random()<0.4) revealSpy(uid);});},1200);
+  renderUnits();renderHUD();refreshTiles();
 }\n`;
 
-    let j3=jsParts[2];
-    const mxyCut=j3.indexOf('function mxyTarget(m,ev){');
-    if(mxyCut<0)throw new Error('js-03.txt 缺少 mxyTarget 边界');
-    j3=j3.slice(0,mxyCut);
+    let j3=jsParts[2];const mxyCut=j3.indexOf('function mxyTarget(m,ev){');if(mxyCut<0)throw new Error('js-03.txt 缺少 mxyTarget 边界');j3=j3.slice(0,mxyCut);
+    let j4=jsParts[3];const mxyResume=j4.indexOf('function mxyTurn(onDone){');if(mxyResume<0)throw new Error('js-04.txt 缺少 mxyTurn 边界');j4=j4.slice(mxyResume);
+    let j7=jsParts[6];const bossCut=j7.indexOf('function spawnBoss(){');if(bossCut<0)throw new Error('js-07.txt 缺少 spawnBoss 边界');j7=j7.slice(0,bossCut);
+    let j8=jsParts[7];const bossResume=j8.indexOf('function announceBoss(b){');if(bossResume<0)throw new Error('js-08.txt 缺少 announceBoss 边界');j8=j8.slice(bossResume);
 
-    let j4=jsParts[3];
-    const mxyResume=j4.indexOf('function mxyTurn(onDone){');
-    if(mxyResume<0)throw new Error('js-04.txt 缺少 mxyTurn 边界');
-    j4=j4.slice(mxyResume);
+    let js=[jsParts[0],jsParts[1],j3,currentMxyTarget,j4,jsParts[4],jsParts[5],j7,currentSpawnBoss,j8,jsParts[8],jsParts[9]].join('');
 
-    let j7=jsParts[6];
-    const bossCut=j7.indexOf('function spawnBoss(){');
-    if(bossCut<0)throw new Error('js-07.txt 缺少 spawnBoss 边界');
-    j7=j7.slice(0,bossCut);
+    const gameplayPatch=String.raw`
+;(()=>{
+  const __startGame090=startGame;
+  startGame=function(){G.lastStandNotice=false;return __startGame090();};
 
-    let j8=jsParts[7];
-    const bossResume=j8.indexOf('function announceBoss(b){');
-    if(bossResume<0)throw new Error('js-08.txt 缺少 announceBoss 边界');
-    j8=j8.slice(bossResume);
+  rollScenario=function(){
+    const hasBoss=Math.random()<0.70,hasShrink=Math.random()<0.45,hasDisaster=Math.random()<0.65;
+    const parts=[];if(hasShrink)parts.push('收 圈');if(hasBoss)parts.push('灾 主');if(hasDisaster)parts.push('天 灾');
+    const name=parts.length?parts.join(' · '):'三 分 稳 局';const descs=[];
+    if(hasShrink)descs.push('第 5 回合起，每 2 回合收缩安全区');if(hasBoss)descs.push('第 5 回合起进入 BOSS 隐藏降临窗口');if(hasDisaster)descs.push('天灾频繁，需谨慎布阵');if(!descs.length)descs.push('风平浪静，纯粹的派系博弈');
+    return {hasBoss,hasShrink,hasDisaster,bossBaseChance:0.18,bossGrowth:0.12,bossMaxChance:0.60,bossStartRound:5,bossForceRound:8,disasterRate:hasDisaster?(0.20+Math.random()*0.15):0.05,shrinkStartRound:5,shrinkInterval:2,spyBaseRate:0.10+Math.random()*0.10,name,desc:descs.join('；')};
+  };
 
-    const js=[jsParts[0],jsParts[1],j3,currentMxyTarget,j4,jsParts[4],jsParts[5],j7,currentSpawnBoss,j8,jsParts[8],jsParts[9]].join('');
+  maybeSpawnBoss=function(){
+    if(!G.scenario||!G.scenario.hasBoss||G.bossActive||G.bossDefeated||G.bossTriggered)return;if(G.round<G.scenario.bossStartRound)return;
+    if(G.round>=(G.scenario.bossForceRound||8)){spawnBoss();return;}
+    const chance=Math.min(G.scenario.bossMaxChance,G.scenario.bossBaseChance+(G.round-G.scenario.bossStartRound)*G.scenario.bossGrowth);if(Math.random()<chance)spawnBoss();
+  };
 
-    /* 先做一次完整语法解析；若拼接失败，直接给玩家可见错误而不是“页面能看但按钮失灵”。 */
+  const markRebelHeadV091=(fac,source='direct')=>{
+    if(fac!=='LLY'&&fac!=='JYM')return;if(!G.rebelHeads)G.rebelHeads={LLY:false,JYM:false};if(G.rebelHeads[fac])return;
+    G.rebelHeads[fac]=true;const n=(G.rebelHeads.LLY?1:0)+(G.rebelHeads.JYM?1:0);
+    if(source==='direct')log(\`⚔ <b>收网节点</b>：GYC 亲自击破 \${factionName(fac)} 统帅（\${n}/2）\`,'kill');else log(\`⚔ <b>残局收网</b>：\${factionName(fac)} 的核心体系已完全崩解，GYC 接管其终局证据（\${n}/2）\`,'sys');
+    if(n>=2&&!G.rebelEndgame.active&&!G.rebelEndgame.failed){const lordAlive=G.units.some(u=>u.hp>0&&u.faction==='GYC'&&u.type==='lord');if(!lordAlive){G.rebelEndgame.failed=true;log('⚔ 两方收网节点虽已完成，但 GYC 统帅已亡，无法完成「收网时刻」终局。','sys');return;}G.rebelEndgame={active:true,readyRound:G.round+1,failed:false};log(\`⚔ <b>收网时刻</b>：两方收网节点皆已完成。若 GYC 统帅存活至第 \${G.rebelEndgame.readyRound} 回合，GYC 完成收网。\`,'kill');}
+  };
+
+  recordRebelHead=function(target,killerFaction){if(!target||killerFaction!=='GYC'||target.type!=='lord'||(target.faction!=='LLY'&&target.faction!=='JYM'))return;markRebelHeadV091(target.faction,'direct');};
+  const syncRebelHeadsV091=()=>{if(G.over||G.bossActive)return;['LLY','JYM'].forEach(fac=>{if(G.rebelHeads?.[fac])return;const coreAlive=G.units.some(u=>u.hp>0&&u.faction===fac&&PRINCE_CORE_TYPES.has(u.type));if(!coreAlive)markRebelHeadV091(fac,'collapse');});};
+  const terminalPossibleV091=()=>{if(G.player==='GYC')return G.units.some(u=>u.hp>0&&u.faction==='GYC'&&u.type==='lord');if(G.player==='LLY'||G.player==='JYM')return G.units.filter(u=>u.hp>0&&u.faction===G.player&&PRINCE_CORE_TYPES.has(u.type)).length>=2;return true;};
+
+  victoryStatusText=function(fac){
+    if(fac==='GYC'){const heads=(G.rebelHeads?.LLY?1:0)+(G.rebelHeads?.JYM?1:0);if(G.rebelEndgame?.failed)return \`终局目标：收网节点 \${heads}/2 · 收网时刻已失败\`;if(G.rebelEndgame?.active)return \`终局目标：收网时刻 · 守住统帅至第 \${G.rebelEndgame.readyRound} 回合\`;return \`终局目标：完成两方收网节点 \${heads}/2\`;}
+    if(fac==='LLY'){const townExists=mapHasTown(),hasTown=Object.values(G.towns||{}).some(v=>v==='LLY');const zy=G.units.filter(u=>u.hp>0&&u.faction==='LLY'&&PRINCE_CORE_TYPES.has(u.type)&&onZY(u.x,u.y)).length;return \`终局目标 · 开源网络：国库 \${G.gold.LLY||0}/\${LLY_TREASURY_GOLD} · \${townExists?(hasTown?'节点✓':'节点×'):'无节点'} · 中枢 \${zy}/\${LLY_ZY_UNITS} · 守势 \${G.roleProgress.LLY||0}/\${LLY_HOLD_TURNS}\`;}
+    if(fac==='JYM'){const regs=jymControlledRegions();const zy=G.units.filter(u=>u.hp>0&&u.faction==='JYM'&&PRINCE_CORE_TYPES.has(u.type)&&onZY(u.x,u.y)).length;return \`终局目标 · 暗网织局：战区 \${regs.length}/2\${regs.length?'（'+regs.map(r=>r.name).join(' / ')+'）':''} · 中枢 \${zy}/\${JYM_ZY_UNITS} · 守势 \${G.roleProgress.JYM||0}/\${JYM_HOLD_TURNS}\`;}
+    if(fac==='MXY')return \`终局目标 · 权谋链：\${Math.min((G.mxy?.index||0)+1,4)}/4 · \${currentMXYEvent()?.name||'已完成'}\`;return '';
+  };
+
+  const __endGame090=endGame;
+  endGame=function(type,winner){if(type!=='faction-defeat')return __endGame090(type,winner);const enemy=MAJOR_FACTIONS.filter(f=>f!==G.player&&G.units.some(u=>u.hp>0&&u.faction===f)).sort((a,b)=>mxyFactionStrength(b)-mxyFactionStrength(a))[0]||MAJOR_FACTIONS.find(f=>f!==G.player)||'GYC';__endGame090('lose',enemy);const f=FACTIONS[G.player];overTitle.textContent='势 力 出 局';overSub.textContent=\`\${f.name} 已失去完成专属终局所需的核心力量，本局失败\`;overEmblem.textContent='✦';overTitle.style.setProperty('--ac',f.color);overBox.style.setProperty('--ac',f.color);};
+
+  checkWin=function(){
+    if(G.over)return;checkMXYDefeat();
+    if(G.player==='MXY'&&G.mxy&&G.mxy.defeated){G.over=true;G.busy=false;renderHUD();endGame('mxy-defeat','MXY');return;}if(G.mxy&&G.mxy.won){G.over=true;G.busy=false;renderHUD();endGame('mxy-victory','MXY');return;}
+    const majorAlive=MAJOR_FACTIONS.filter(f=>G.units.some(u=>u.hp>0&&u.faction===f));if(G.player==='MXY'&&G.mxy&&G.mxy.spawned&&!G.mxy.won&&majorAlive.length<=1){G.over=true;G.busy=false;renderHUD();endGame('mxy-collapse','MXY');return;}
+    if(!G.bossActive){syncRebelHeadsV091();updateRebelEndgame();if(G.roleVictory&&G.roleVictory.faction&&G.units.some(u=>u.hp>0&&u.faction===G.roleVictory.faction)){G.over=true;G.busy=false;renderHUD();const w=G.roleVictory.faction;endGame(w===G.player?'win':'lose',w);return;}if(G.player!=='MXY'&&!terminalPossibleV091()){G.over=true;G.busy=false;renderHUD();endGame('faction-defeat',G.player);return;}}
+    if(G.bossActive&&!G.bossDefeated){const boss=G.units.find(u=>u.isBoss&&u.hp>0);if(!boss){G.bossDefeated=true;G.bossActive=false;G.busy=false;resolveBossRewards();log('✦ 联合讨伐结束。BOSS 已陨落，各身份恢复自己的专属终局目标。','boss');renderHUD();syncRebelHeadsV091();updateRebelEndgame();return;}const playerAlive=G.units.some(u=>u.faction===G.player&&u.hp>0);if(!playerAlive){G.over=true;G.busy=false;renderHUD();endGame('boss-defeat');return;}return;}
+    if(majorAlive.length===1&&!G.lastStandNotice){G.lastStandNotice=true;const lone=majorAlive[0];log(\`♜ <b>\${factionName(lone)} 已取得绝对军事优势</b>，但战局尚未结束：必须完成该身份的专属终局目标。\`,'sys');renderHUD();}if(majorAlive.length===0&&!G.over){G.over=true;G.busy=false;renderHUD();endGame('draw');}
+  };
+
+  const __announceBoss090=announceBoss;announceBoss=function(b){__announceBoss090(b);dbDesc.textContent=\`⚠ 共同危机：优先击败 \${b.name} · 讨伐后恢复身份终局\`;};
+})();
+`;
+    js += gameplayPatch;
+
     new Function(js);
-
-    const st=document.createElement('style');
-    st.textContent=css;
-    document.head.appendChild(st);
+    const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
     document.body.innerHTML=body;
-
-    window.addEventListener('error',e=>{
-      console.error('9014 runtime error:',e.error||e.message);
-    });
-
-    const sc=document.createElement('script');
-    sc.textContent=js;
-    document.body.appendChild(sc);
-  }catch(e){
-    console.error(e);
-    showFatal(e&&e.message?e.message:e);
-  }
+    window.addEventListener('error',e=>console.error('9014 runtime error:',e.error||e.message));
+    const sc=document.createElement('script');sc.textContent=js;document.body.appendChild(sc);
+  }catch(e){console.error(e);showFatal(e&&e.message?e.message:e);}
 })();
 </script>
 </body>
