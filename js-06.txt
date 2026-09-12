@@ -1,0 +1,387 @@
+<div class="ui-bar en"><i class="${u.energy>=100?'full':''}" style="width:${u.energy}%"></i></div>
+        <span class="ui-bar-val">${u.energy}/100</span></div>
+      <div class="ui-bar-row"><span class="ui-bar-lbl">经验</span>
+        <div class="ui-bar xp"><i style="width:${Math.min(100,expHave/expNeed*100)}%"></i></div>
+        <span class="ui-bar-val">${expHave}/${expNeed}</span></div>
+    </div>
+    <div class="ui-stats">
+      <div class="ui-stat"><span>攻击</span><b class="${rage||u.rageBuff?'hot':''}">${atkNow}</b></div>
+      <div class="ui-stat"><span>移动</span><b>${movNow}</b></div>
+      <div class="ui-stat"><span>射程</span><b>${rngNow}</b></div>
+      <div class="ui-stat"><span>防御</span><b class="${u.shieldWall?'up':''}">×${(terr.def*(u.shieldWall?0.5:1)*(u.rageBuff?1.2:1)*(u.type==='guard'?0.85:1)).toFixed(2)}</b></div>
+    </div>
+    <div style="font-size:10px;color:#7d7768;margin-bottom:6px">克制：${ctTags}</div>
+    <div class="ui-pattern" style="--c:${color}">
+      <b>兵种范围</b> · ${t.desc}
+      ${u.shield>0?`<br><span style="color:#c79ee0">护盾 ${u.shield}</span>`:''}
+      ${rage?`<br><span style="color:#ff8574">◈ 藏锋破局发动中</span>`:''}
+    </div>
+    ${zoneTag}
+    ${spyTag}
+    ${u.isMXY&&u.envoy?`<div class="ui-pattern" style="--c:#f0d879;background:rgba(240,216,121,.09);border-color:rgba(240,216,121,.45)"><b>✉ 外交护行</b> · 受到伤害 -45%，三方降低追击优先级；当前无法主动攻击。</div>`:''}
+    ${u.isMXY&&currentMXYEvent()?.key==='balance'?`<div class="ui-pattern" style="--c:#f0d879;background:rgba(240,216,121,.07);border-color:rgba(240,216,121,.35)"><b>衡 制衡强权</b> · 当前强权：${balanceState?.target?factionName(balanceState.target):'暂无'} · ${balanceState?.reason||''}</div>`:''}
+    ${sk?`<div class="ui-pattern" style="--c:${color}">
+      <b>${sk.icon} ${sk.name}</b> · 消耗 ${sk.cost} 能量 · CD ${sk.cd}<br>
+      <span style="font-size:10.5px">${sk.desc}</span>
+    </div>
+    <div class="action-row">
+      <button class="abtn skill ${G.skillMode?'active':''}" id="castSkill" ${canSkill||G.skillMode?'':'disabled'} style="--c:${color}">
+        ${G.skillMode?'✕ 取消技能':`${sk.icon} ${sk.name}`}
+        <small>${G.skillMode?'点击范围确认':u.skillCd>0?'冷却 '+u.skillCd:canSkill?'点击施放':u.type==='mxy_lord'&&currentMXYEvent()?.key!=='meet'?'仅会盟事件可用':u.energy<sk.cost?'能量不足':'已行动'}</small>
+      </button>
+      ${u.faction===G.player?(u.isMXY?`
+        <button class="abtn skill" id="mxyBalanceBtn" ${balanceCan?'':'disabled'} style="--c:#f0d879;grid-column:span 2">衡 制衡令<small>${balanceState?.reason||'仅制衡阶段可用'} · ${MXY_BALANCE_SKILL.cost}能量</small></button>
+      `:`
+        <button class="abtn" id="upgradeBtn" ${canUpgrade?'':'disabled'} style="--c:${color}">⇧ 升级<small>50金</small></button>
+        <button class="abtn" id="healBtn" ${canHeal?'':'disabled'} style="--c:${color}">✚ 治疗<small>30金</small></button>
+      `):`<div style="grid-column:span 2;text-align:center;font-size:10.5px;color:#7d7768;padding:5px">敌方单位</div>`}
+    </div>`:''}`;
+
+  const skillBtn=unitInfoEl.querySelector('#castSkill');
+  if(skillBtn){
+    if(G.skillMode)skillBtn.addEventListener('click',()=>cancelSkillMode());
+    else if(canSkill)skillBtn.addEventListener('click',()=>enterSkillMode());
+  }
+  const upBtn=unitInfoEl.querySelector('#upgradeBtn');
+  if(upBtn&&canUpgrade)upBtn.addEventListener('click',()=>upgradeUnit(u));
+  const hpBtn=unitInfoEl.querySelector('#healBtn');
+  if(hpBtn&&canHeal)hpBtn.addEventListener('click',()=>healUnit(u));
+  const balanceBtn=unitInfoEl.querySelector('#mxyBalanceBtn');
+  if(balanceBtn&&balanceCan)balanceBtn.addEventListener('click',()=>activateMXYBalance(u,true));
+}
+
+/* ==================== 特效 ==================== */
+function log(text,cls){
+  const d=document.createElement('div');
+  if(cls)d.className=cls;
+  d.innerHTML=text;
+  logEl.appendChild(d);
+  logEl.scrollTop=logEl.scrollHeight;
+  while(logEl.children.length>80)logEl.removeChild(logEl.firstChild);
+}
+function float(u,val,kind){
+  const tile=tileSize();
+  const el=document.createElement('div');
+  el.className='dmg'+(kind?' '+kind:'');
+  el.textContent=(kind==='heal'?'+':'')+val;
+  el.style.left=((u.x+0.5)*tile)+'px';
+  el.style.top=((u.y+0.45)*tile)+'px';
+  fxEl.appendChild(el);
+  setTimeout(()=>el.remove(),1000);
+}
+function slashAt(x,y,kind){
+  const tile=tileSize();
+  const el=document.createElement('div');
+  el.className=kind==='skill'?'skill-fx':'slash';
+  el.style.left=(x*tile)+'px';el.style.top=(y*tile)+'px';
+  fxEl.appendChild(el);
+  setTimeout(()=>el.remove(),kind==='skill'?750:580);
+}
+function healFX(x,y){
+  const tile=tileSize();
+  const el=document.createElement('div');
+  el.className='heal-fx';
+  el.style.left=(x*tile)+'px';el.style.top=(y*tile)+'px';
+  fxEl.appendChild(el);
+  setTimeout(()=>el.remove(),820);
+}
+function lvFX(x,y){
+  const tile=tileSize();
+  const el=document.createElement('div');
+  el.className='lv-fx';
+  el.style.left=(x*tile)+'px';el.style.top=(y*tile)+'px';
+  fxEl.appendChild(el);
+  setTimeout(()=>el.remove(),1500);
+}
+function meteorFX(x,y){
+  const tile=tileSize();
+  const el=document.createElement('div');
+  el.className='dis-fx meteor';
+  el.style.left=(x*tile)+'px';el.style.top=(y*tile)+'px';
+  fxEl.appendChild(el);
+  setTimeout(()=>el.remove(),900);
+}
+function thunderFX(x,y){
+  const tile=tileSize();
+  const el=document.createElement('div');
+  el.className='dis-fx thunder';
+  el.style.left=(x*tile)+'px';el.style.top=(y*tile)+'px';
+  fxEl.appendChild(el);
+  setTimeout(()=>el.remove(),700);
+}
+function quakeFX(x,y){
+  const tile=tileSize();
+  const el=document.createElement('div');
+  el.className='dis-fx quake';
+  el.style.left=(x*tile)+'px';el.style.top=(y*tile)+'px';
+  fxEl.appendChild(el);
+  setTimeout(()=>el.remove(),950);
+}
+function shakeUnit(u){
+  const el=unitEls.get(u.id);
+  if(!el)return;
+  el.classList.add('hit');
+  setTimeout(()=>el.classList.remove('hit'),340);
+}
+
+function computeMoves(u){
+  const res=[];
+  const seen=new Map();
+  seen.set(u.x+','+u.y,0);
+  const q=[[u.x,u.y,0]];
+  const maxStep=calcMov(u);
+  while(q.length){
+    const [x,y,c]=q.shift();
+    if(c>=maxStep)continue;
+    for(const [dx,dy] of DIRS){
+      const nx=x+dx,ny=y+dy;
+      if(!inBoard(nx,ny))continue;
+      if(!isPassableTile(nx,ny))continue;
+      const nc=c+terrainAt(nx,ny).movCost;
+      if(nc>maxStep)continue;
+      const k=nx+','+ny;
+      if(seen.has(k)&&seen.get(k)<=nc)continue;
+      seen.set(k,nc);
+      const occ=unitAt(nx,ny);
+      if(occ&&occ.faction!==u.faction)continue;
+      q.push([nx,ny,nc]);
+      if(!occ)res.push([nx,ny]);
+    }
+  }
+  return res;
+}
+
+function gainExp(u,amount){
+  if(u.isBoss||u.isMinion||u.isMXY)return;
+  u.exp+=amount;
+  float(u,amount,'exp');
+  const idx=Math.min(u.level,LEVEL_EXP.length-1);
+  if(u.exp>=LEVEL_EXP[idx]&&u.level<6){
+    u.level++;
+    u.maxHp+=12;u.hp=Math.min(u.maxHp,u.hp+12);
+    u.atk+=3;
+    if(u.level===4)u.mov+=1;
+    lvFX(u.x,u.y);
+    log(`<b>${factionName(u.faction)} · ${u.typeName}</b> 升至 Lv${u.level}！`,'lv');
+  }
+}
+
+
+const DUEL_CORE_TYPES=new Set(['lord','brave','sage','guard']);
+
+function duelPower(u,opponent){
+  // 单挑强调个体战力：攻击约占一半，其余来自兵力底盘、等级和当前状态。
+  const atkPart=calcAtk(u)*2.15;
+  const bodyPart=u.maxHp*0.24;
+  const levelPart=(u.level||1)*11;
+  const hpRatio=Math.max(0,Math.min(1,u.hp/u.maxHp));
+  const conditionPart=18+hpRatio*24;
+  let p=atkPart+bodyPart+levelPart+conditionPart;
+  const ct=counterState(u,opponent);
+  if(ct==='adv')p*=1.08;
+  else if(ct==='dis')p*=0.94;
+  return Math.max(1,Math.round(p));
+}
+
+function canTriggerDuel(att,def){
+  if(!G.duel||G.round<2||G.duel.lastRound===G.round)return false;
+  if(!att||!def||att.hp<=0||def.hp<=0||att.faction===def.faction)return false;
+  if(dist(att,def)!==1)return false;
+  if(att.isBoss||def.isBoss||att.isMinion||def.isMinion)return false;
+  if(!DUEL_CORE_TYPES.has(att.type)||!DUEL_CORE_TYPES.has(def.type))return false;
+  return Math.random()<(G.duel.chance||0.07);
+}
+
+function showDuelResult(att,def,pA,pB,rA,rB,winner,loser,loserDmg,winnerDmg){
+  if(!duelBanner)return;
+  duelSideA.style.setProperty('--c',factionColor(att.faction));
+  duelSideB.style.setProperty('--c',factionColor(def.faction));
+  duelNameA.textContent=`${factionName(att.faction)} · ${att.typeName}`;
+  duelNameB.textContent=`${factionName(def.faction)} · ${def.typeName}`;
+  duelPowerA.textContent=pA;duelPowerB.textContent=pB;
+  duelRollA.textContent=rA;duelRollB.textContent=rB;
+  const killed=loser.hp<=0;
+  duelResult.innerHTML=`<b>${factionName(winner.faction)} · ${winner.typeName}</b> 胜出！`+
+    `${factionName(loser.faction)} · ${loser.typeName} 损失 ${loserDmg} 兵力${killed?'，当场阵亡':''}；`+
+    `胜者亦负伤 ${winnerDmg}。`;
+  duelBanner.classList.remove('on');void duelBanner.offsetWidth;duelBanner.classList.add('on');
+  if(duelFlash){duelFlash.classList.remove('on');void duelFlash.offsetWidth;duelFlash.classList.add('on');}
+  setTimeout(()=>duelBanner.classList.remove('on'),2400);
+}
+
+function resolveDuel(att,def){
+  G.duel.lastRound=G.round;G.duel.count++;
+  const pA=duelPower(att,def),pB=duelPower(def,att);
+  // 只保留 ±10% 的临阵随机，保证绝大多数结果仍由基础战力决定。
+  const rA=Math.round(pA*(0.90+Math.random()*0.20));
+  const rB=Math.round(pB*(0.90+Math.random()*0.20));
+  let winner,loser,winRoll,loseRoll;
+  if(rA===rB){
+    if(pA>=pB){winner=att;loser=def;winRoll=rA;loseRoll=rB;}
+    else{winner=def;loser=att;winRoll=rB;loseRoll=rA;}
+  }else if(rA>rB){winner=att;loser=def;winRoll=rA;loseRoll=rB;}
+  else{winner=def;loser=att;winRoll=rB;loseRoll=rA;}
+
+  const gap=Math.max(0,Math.min(1,(winRoll-loseRoll)/Math.max(1,winRoll)));
+  const loserPct=0.42+Math.min(0.28,gap*0.85);
+  const winnerPct=Math.max(0.10,0.20-gap*0.18);
+  const loserDmg=Math.max(1,Math.round(loser.maxHp*loserPct));
+  let winnerDmg=Math.max(1,Math.round(winner.maxHp*winnerPct));
+  // 单挑胜者至少保留 1 点兵力，避免出现“胜者同时阵亡”的含糊结算。
+  winnerDmg=Math.min(winnerDmg,Math.max(0,winner.hp-1));
+
+  loser.hp-=loserDmg;winner.hp-=winnerDmg;
+  float(loser,loserDmg,'crit');float(winner,winnerDmg,'');
+  shakeUnit(loser);shakeUnit(winner);slashAt(att.x,att.y);slashAt(def.x,def.y);
+
+  if(G.stats.damageDealt[winner.faction]!==undefined)G.stats.damageDealt[winner.faction]+=loserDmg;
+  if(G.stats.damageDealt[loser.faction]!==undefined)G.stats.damageDealt[loser.faction]+=winnerDmg;
+  recordMXYBalanceDamage(loser,winner.faction,loserDmg);
+  recordMXYBalanceDamage(winner,loser.faction,winnerDmg);
+  if(G.duel.wins[winner.faction]!==undefined)G.duel.wins[winner.faction]++;
+  if(G.duel.fights){
+    if(G.duel.fights[att.faction]!==undefined)G.duel.fights[att.faction]++;
+    if(G.duel.fights[def.faction]!==undefined)G.duel.fights[def.faction]++;
+  }
+
+  log(`⚔ <b>阵前单挑！</b> ${factionName(att.faction)} · ${att.typeName}（战力 ${pA}） VS ${factionName(def.faction)} · ${def.typeName}（战力 ${pB}）`,'duel');
+  log(`单挑临阵值 <b>${rA} : ${rB}</b>，<b>${factionName(winner.faction)} · ${winner.typeName}</b> 胜出`,'duel');
+
+  gainExp(winner,loser.hp<=0?70:35);
+  if(loser.hp>0)gainExp(loser,10);
+  if(loser.hp<=0){
+    log(`<b>${factionName(loser.faction)} · ${loser.typeName}</b> 单挑败北，阵亡！`,'kill');
+    if(G.stats.unitsLost[loser.faction]!==undefined)G.stats.unitsLost[loser.faction]++;
+    if(G.stats.kills[winner.faction]!==undefined)G.stats.kills[winner.faction]++;
+    recordRebelHead(loser,winner.faction);
+  }
+
+  showDuelResult(att,def,pA,pB,rA,rB,winner,loser,loserDmg,winnerDmg);
+  att.acted=true;att.moved=true;
+  renderUnits();renderHUD();
+  setTimeout(checkWin,620);
+}
+
+function doAttack(att,def,mulOverride){
+  if(canTriggerDuel(att,def)){resolveDuel(att,def);return;}
+  slashAt(def.x,def.y);
+  const raging=isRaging(att)||att.rageBuff;
+  let baseMul=mulOverride!==undefined?mulOverride:1;
+  const ctState=counterState(att,def);
+  let ctMul=1;
+  if(ctState==='adv')ctMul=1.5;else if(ctState==='dis')ctMul=0.75;
+  let dmg=Math.round(calcAtk(att)*baseMul*ctMul);
+  const crit=Math.random()<0.15;
+  if(crit)dmg=Math.round(dmg*1.6);
+  if(def.type==='guard')dmg=Math.round(dmg*0.85);
+  if(def.shieldWall)dmg=Math.round(dmg*0.5);
+  dmg=Math.round(dmg/terrainAt(def.x,def.y).def);
+  if(def.rageBuff)dmg=Math.round(dmg*1.2);
+  dmg=mitigateBossDamage(def,dmg);
+  if(def.isMXY&&def.envoy)dmg=Math.max(1,Math.round(dmg*0.55));
+
+  // LBL 隐身采用单独闪避池：隐身期间不再叠加地形闪避。
+  // 若本次没有闪掉，则隐身立即被识破并由这一击正常造成伤害。
+  let brokeInvisibility=false;
+  if(def.invisible){
+    if(Math.random()<(def.invisibleChance||0.35)){
+      log(`${def.typeName} 隐身闪避了攻击`,'sys');
+      att.acted=true;att.moved=true;
+      renderUnits();renderHUD();
+      setTimeout(checkWin,400);return;
+    }
+    def.invisible=false;
+    def.invisibleChance=0;
+    brokeInvisibility=true;
+    if(def.isBoss&&def.faction==='LBL')log(`☯ LBL 的隐身被识破！`,'boss');
+  }
+  if(!brokeInvisibility && Math.random()<terrainAt(def.x,def.y).eva){
+    log(`${def.typeName} 闪避了攻击`,'sys');
+    att.acted=true;att.moved=true;
+    renderUnits();renderHUD();
+    setTimeout(checkWin,400);return;
+  }
+  let absorbed=0;
+  if(def.shield>0){
+    absorbed=Math.min(def.shield,dmg);
+    def.shield-=absorbed;dmg-=absorbed;
+    if(absorbed>0)float(def,absorbed,'shield');
+  }
+  const dealt=Math.max(0,dmg);
+  if(dealt>0){
+    def.hp-=dealt;
+    const kind=crit?'crit':(ctState==='adv'?'adv':(raging?'rage':''));
+    float(def,dealt,kind);
+  }
+  shakeUnit(def);
+  if(G.stats.damageDealt[att.faction]!==undefined)G.stats.damageDealt[att.faction]+=dealt;
+  if(def.isBoss&&G.stats.bossDamage[att.faction]!==undefined)G.stats.bossDamage[att.faction]+=dealt;
+  recordMXYBalanceDamage(def,att.faction,dealt);
+
+  const ctLabel=ctState==='adv'?' <span style="color:#ffd166">[克制]</span>':ctState==='dis'?' <span style="color:#8d8578">[被克]</span>':'';
+  const rageTag=raging?' <span style="color:#ff8574">[狂暴]</span>':'';
+  log(`<span style="color:${factionColor(att.faction)}">${factionName(att.faction)}</span> ${att.typeName}${rageTag}${ctLabel} 攻击 <span style="color:${factionColor(def.faction)}">${factionName(def.faction)}</span> ${def.typeName}，造成 <b>${dealt}</b> 伤害${crit?'（暴击）':''}`,'hit');
+
+  if(def.hp>0&&dist(att,def)===1&&def.type!=='sage'&&!att.isBoss&&!att.isMinion&&!(def.isMXY&&def.envoy)){
+    const back=Math.round(calcAtk(def)*0.5);
+    att.hp-=back;shakeUnit(att);float(att,back,'');
+    log(`${def.typeName} 反击，造成 ${back} 伤害`,'hit');
+    if(att.hp<=0){
+      log(`<b>${factionName(att.faction)} · ${att.typeName}</b> 阵亡`,'kill');
+      if(G.stats.unitsLost[att.faction]!==undefined)G.stats.unitsLost[att.faction]++;
+      recordRebelHead(att,def.faction);
+    }
+  }
+  gainExp(att,15);
+  if(def.hp<=0){
+    gainExp(att,60);
+    log(`<b>${factionName(def.faction)} · ${def.typeName}</b> 阵亡`,'kill');
+    if(G.stats.unitsLost[def.faction]!==undefined)G.stats.unitsLost[def.faction]++;
+    if(G.stats.kills[att.faction]!==undefined)G.stats.kills[att.faction]++;
+    recordRebelHead(def,att.faction);
+  }
+  att.acted=true;att.moved=true;
+  renderUnits();renderHUD();
+  setTimeout(checkWin,520);
+}
+
+function flankBonus(att,def){
+  const dx=att.x-def.x,dy=att.y-def.y;
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+  for(const [ddx,ddy] of dirs){
+    if(dx===ddx&&dy===ddy){
+      const fx=def.x-ddx,fy=def.y-ddy;
+      if(!inBoard(fx,fy))return false;
+      const ally=unitAt(fx,fy);
+      return ally&&ally.faction===att.faction&&ally.id!==att.id;
+    }
+  }
+  return false;
+}
+
+function enterSkillMode(){
+  const u=G.selected;
+  if(!u||!canUseSkill(u))return;
+  if(u.type==='brave'||u.type==='guard'||u.type==='mxy_lord'){castSkill();return;}
+  G.skillMode=true;
+  G.moveCells=[];G.atkCells=[];
+  const cells=[];
+  if(u.type==='lord'){
+    for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+      if(dx===0&&dy===0)continue;
+      if(Math.abs(dx)+Math.abs(dy)>2)continue;
+      const nx=u.x+dx,ny=u.y+dy;
+      if(!inBoard(nx,ny))continue;
+      cells.push([nx,ny]);
+    }
+  } else if(u.type==='sage'){
+    for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){
+      if(dx===0&&dy===0)continue;
+      if(Math.abs(dx)+Math.abs(dy)>3)continue;
+      const nx=u.x+dx,ny=u.y+dy;
+      if(!inBoard(nx,ny))continue;
+      cells.push([nx,ny]);
+    }
+  }
+  G.skillCells=cells;
+  renderHighlights();
