@@ -1,0 +1,321 @@
+  const alliesNear=G.units.filter(t=>t.hp>0&&t.faction===fac&&t.id!==u.id&&dist(t,u)<=2).length;
+        if(alliesNear>=1)use=true;
+      } else if(u.type==='sage'){
+        const enemiesNear=targets.filter(e=>dist(e,u)<=3).length;
+        if(enemiesNear>=1)use=true;
+      } else use=true;
+      if(use){
+        const sk=SKILLS[u.type];
+        u.energy-=sk.cost;u.skillCd=sk.cd+1;
+        slashAt(u.x,u.y,'skill');
+        if(u.type==='lord'){
+          G.units.forEach(t=>{
+            if(t.hp>0&&t.faction===fac&&dist(t,u)<=2){
+              t.flagBuff=true;
+              const heal=30;
+              t.hp=Math.min(t.maxHp,t.hp+heal);
+              float(t,heal,'heal');
+            }
+          });
+          log(`<b>${factionName(fac)}</b> 统帅发动战旗号令`,'skill');
+        } else if(u.type==='brave'){
+          u.rageBuff=true;
+          log(`<b>${factionName(fac)}</b> 猛将发动狂暴突袭`,'skill');
+        } else if(u.type==='sage'){
+          let cnt=0;
+          G.units.forEach(t=>{
+            if(t.hp<=0)return;
+            if(t.faction===fac)return;
+            if(dist(t,u)>3)return;
+            if(G.bossActive && !G.bossDefeated && !(t.isBoss||t.isMinion))return;
+            if(!G.bossActive && (t.isBoss||t.isMinion))return;
+            const skillDmg=mitigateBossDamage(t,30);t.hp-=skillDmg;float(t,skillDmg,'crit');shakeUnit(t);cnt++;
+            if(G.stats.damageDealt[fac]!==undefined)G.stats.damageDealt[fac]+=skillDmg;
+            if(t.isBoss&&G.stats.bossDamage[fac]!==undefined)G.stats.bossDamage[fac]+=skillDmg;
+            recordMXYBalanceDamage(t,fac,skillDmg);
+            if(t.hp<=0){log(`<b>${factionName(t.faction)} · ${t.typeName}</b> 阵亡`,'kill');
+              if(G.stats.unitsLost[t.faction]!==undefined)G.stats.unitsLost[t.faction]++;
+              if(G.stats.kills[fac]!==undefined)G.stats.kills[fac]++;
+              recordRebelHead(t,fac);}
+          });
+          log(`<b>${factionName(fac)}</b> 谋士发动火计焚营，命中 ${cnt} 目标`,'skill');
+        } else if(u.type==='guard'){
+          u.shieldWall=true;
+          u.hp=Math.min(u.maxHp,u.hp+20);
+          float(u,20,'heal');
+          log(`<b>${factionName(fac)}</b> 精兵发动铁壁结阵`,'skill');
+        }
+        u.acted=true;u.moved=true;
+        renderUnits();renderHUD();
+        setTimeout(step,700);return;
+      }
+    }
+
+    targets.sort((a,b)=>{
+      const bal=G.mxy&&G.mxy.balance&&G.mxy.balance.active?G.mxy.balance.target:null;
+      const kA=(a.hp<=calcAtk(u)*1.5?-100:0)+dist(u,a)*(counterState(u,a)==='adv'?0.6:1)+(a.isMXY&&a.envoy?35:0)+(bal&&a.faction===bal&&fac!==bal?-24:0);
+      const kB=(b.hp<=calcAtk(u)*1.5?-100:0)+dist(u,b)*(counterState(u,b)==='adv'?0.6:1)+(b.isMXY&&b.envoy?35:0)+(bal&&b.faction===bal&&fac!==bal?-24:0);
+      return kA-kB;
+    });
+    const target=targets[0];
+    if(!target){u.acted=true;renderUnits();setTimeout(step,180);return;}
+
+    if(inPattern(u,target.x,target.y)){
+      const flank=flankBonus(u,target);
+      doAttack(u,target,flank?1.5:1);
+      setTimeout(step,640);return;
+    }
+    const moves=computeMoves(u);
+    if(!moves.length){u.acted=true;renderUnits();setTimeout(step,180);return;}
+    let best=null,bestScore=Infinity;
+    for(const [mx,my] of moves){
+      let score=Math.abs(mx-target.x)+Math.abs(my-target.y);
+      const testU={...u,x:mx,y:my};
+      if(inPattern(testU,target.x,target.y))score-=60;
+      if(MAP[my][mx]===4&&G.towns[mx+','+my]!==fac)score-=20;
+      if(MAP[my][mx]===5)score-=5;
+      if(G.disaster){
+        const k=G.disaster.key;
+        if(k==='fire'&&MAP[my][mx]===1)score+=25;
+        if(k==='blizzard'&&MAP[my][mx]!==5)score+=8;
+        if(k==='flood'&&MAP[my][mx]===3)score+=15;
+      }
+      // 安全区外重罚
+      if(G.shrink.active && !inSafeZone(mx,my)) score += 60;
+      // 收缩期倾向中心
+      if(G.shrink.active && G.round >= G.shrink.nextRound - 1){
+        const cx=(G.shrink.colMin+G.shrink.colMax)/2;
+        const cy=(G.shrink.rowMin+G.shrink.rowMax)/2;
+        score += Math.abs(mx-cx)+Math.abs(my-cy);
+      }
+      targets.forEach(e=>{if(e!==target&&Math.abs(mx-e.x)+Math.abs(my-e.y)<=1)score+=6;});
+      if(score<bestScore){bestScore=score;best=[mx,my];}
+    }
+    if(best&&(best[0]!==u.x||best[1]!==u.y)){
+      u.x=best[0];u.y=best[1];u.moved=true;
+      if(MAP[u.y][u.x]===4){
+        const k=u.x+','+u.y;
+        if(G.towns[k]!==u.faction){G.towns[k]=u.faction;log(`<b>${factionName(u.faction)}</b> 接管算力节点 (${u.x},${u.y})`,'evt');}
+      }
+      renderUnits();refreshTiles();
+    }
+    setTimeout(()=>{
+      if(u.hp<=0){step();return;}
+      let t2pool=alive().filter(e=>e.faction!==fac);
+      if(G.bossActive && !G.bossDefeated){
+        const bossUnits=t2pool.filter(e=>e.isBoss||e.isMinion);
+        if(bossUnits.length) t2pool=bossUnits;
+      }
+      const bal=G.mxy&&G.mxy.balance&&G.mxy.balance.active?G.mxy.balance.target:null;
+      const t2=t2pool.sort((a,b)=>(dist(u,a)+(a.isMXY&&a.envoy?6:0)+(bal&&a.faction===bal&&fac!==bal?-4:0))-(dist(u,b)+(b.isMXY&&b.envoy?6:0)+(bal&&b.faction===bal&&fac!==bal?-4:0)))[0];
+      if(t2&&inPattern(u,t2.x,t2.y)){
+        const flank=flankBonus(u,t2);
+        doAttack(u,t2,flank?1.5:1);
+      } else {u.acted=true;renderUnits();}
+      setTimeout(step,580);
+    },420);
+  }
+  step();
+}
+
+/* ==================== BOSS 讨伐结算 ==================== */
+function resolveBossRewards(){
+  const scores=MAJOR_FACTIONS.map(f=>({f,dmg:(G.stats.bossDamage&&G.stats.bossDamage[f])||0})).sort((a,b)=>b.dmg-a.dmg);
+  const top=scores[0]&&scores[0].dmg>0?scores[0]:null;
+  scores.forEach(({f,dmg})=>{
+    if(dmg<=0)return;
+    G.gold[f]=(G.gold[f]||0)+20;
+    G.units.filter(u=>u.hp>0&&u.faction===f&&PRINCE_CORE_TYPES.has(u.type)).forEach(u=>gainExp(u,15));
+  });
+  if(top){
+    G.gold[top.f]=(G.gold[top.f]||0)+50;
+    G.units.filter(u=>u.hp>0&&u.faction===top.f&&PRINCE_CORE_TYPES.has(u.type)).forEach(u=>{
+      const heal=Math.max(1,Math.round(u.maxHp*0.25));u.hp=Math.min(u.maxHp,u.hp+heal);float(u,heal,'heal');gainExp(u,25);
+    });
+    log(`✦ <b>讨伐魁首：${factionName(top.f)}</b> · 对 BOSS 造成 ${top.dmg} 伤害，额外获得 50 金、全军整备与经验。`,'boss');
+  } else log(`✦ BOSS 已陨落，但三方未形成可统计的讨伐贡献。`,'boss');
+  scores.filter(x=>x.dmg>0&&(!top||x.f!==top.f)).forEach(x=>log(`✦ ${factionName(x.f)} 参与讨伐：${x.dmg} 伤害，获得 20 金与经验。`,'boss'));
+  G.bossRewards={top:top?top.f:null,scores};
+  G.units.filter(u=>u.isMinion&&u.hp>0).forEach(u=>u.hp=0);
+  boardEl.classList.remove('boss-zone');
+  renderBossBar();renderUnits();renderHUD();
+}
+
+/* ==================== 胜负 ==================== */
+function checkWin(){
+  if(G.over)return;
+  checkMXYDefeat();
+  if(G.player==='MXY'&&G.mxy&&G.mxy.defeated){G.over=true;G.busy=false;renderHUD();endGame('mxy-defeat','MXY');return;}
+  if(G.mxy&&G.mxy.won){G.over=true;G.busy=false;renderHUD();endGame('mxy-victory','MXY');return;}
+  const majorAlive=MAJOR_FACTIONS.filter(f=>G.units.some(u=>u.hp>0&&u.faction===f));
+  if(G.player==='MXY'&&G.mxy&&G.mxy.spawned&&!G.mxy.won&&majorAlive.length<=1){
+    G.over=true;G.busy=false;renderHUD();endGame('mxy-collapse','MXY');return;
+  }
+  if(!G.bossActive){
+    if(G.roleVictory&&G.roleVictory.faction&&G.units.some(u=>u.hp>0&&u.faction===G.roleVictory.faction)){
+      G.over=true;G.busy=false;renderHUD();const w=G.roleVictory.faction;endGame(w===G.player?'win':'lose',w);return;
+    }
+  }
+  if(G.bossActive&&!G.bossDefeated){
+    const boss=G.units.find(u=>u.isBoss&&u.hp>0);
+    if(!boss){
+      G.bossDefeated=true;G.bossActive=false;G.busy=false;
+      resolveBossRewards();
+      log(`✦ 联合讨伐结束。BOSS 已陨落，但天下之争继续。`,'boss');
+      renderHUD();
+      // BOSS 不再是直接胜利条件；恢复各身份的终局进度判断。
+      updateRebelEndgame();
+      return;
+    }
+    const playerAlive=G.units.some(u=>u.faction===G.player&&u.hp>0);
+    if(!playerAlive){G.over=true;G.busy=false;renderHUD();endGame('boss-defeat');return;}
+    return;
+  }
+  const facs=G.order.filter(k=>G.units.some(u=>u.faction===k&&u.hp>0));
+  if(facs.length<=1&&!G.over){
+    G.over=true;G.busy=false;renderHUD();
+    const winner=facs[0];
+    if(winner){const isPlayer=winner===G.player;endGame(isPlayer?'win':'lose',winner);}else endGame('draw');
+  }
+}
+
+/* ==================== 结算界面 ==================== */
+function endGame(type,winner){
+  G.over=true;G.busy=false;
+  clearSave();
+  renderHUD();
+  let title='天 下 归 一',sub='',emblem='✦',accent='#d4af37';
+  if(type==='mxy-victory'){
+    const f=FACTIONS.MXY;title='领 主 定 鼎';sub=G.player==='MXY'?'你以合纵、观势与制衡三方完成权谋胜利':'MXY 不占城池，以权谋制衡三方改写了战局';emblem='♛';accent=f.color;
+  } else if(type==='mxy-defeat'){
+    const f=FACTIONS.MXY;title='领 主 败 退';sub='MXY 被击败，权谋链未能完成';emblem='♛';accent=f.color;
+  } else if(type==='mxy-collapse'){
+    const f=FACTIONS.MXY;title='势 失 其 衡';sub='天下只剩一方主要势力，领主失去了合纵制衡的空间';emblem='♛';accent=f.color;
+  } else if(type==='boss-victory'){
+    const b=G.bossKey?BOSSES[G.bossKey]:{name:'BOSS',title:''};
+    title='B O S S 陨 落';
+    sub=`${b.name} 被击败，9014 重归寂静`;
+    emblem='✦';accent=G.bossKey?b.color:'#ffd166';
+  } else if(type==='boss-defeat'){
+    const b=G.bossKey?BOSSES[G.bossKey]:{name:'BOSS'};
+    title='B O S S 未 灭';
+    sub=`你倒在了 ${b.name} 面前`;
+    emblem=G.bossKey?b.icon:'✵';accent=G.bossKey?b.color:'#ff2a4a';
+  } else if(type==='win'){
+    const f=FACTIONS[winner];
+    if(G.roleVictory&&G.roleVictory.faction===winner&&G.roleVictory.type==='rebel'){title='收 网 定 局';sub='GYC 亲自击破两方核心负责人，并守住自身统帅完成收网窗口';emblem='⚔';}
+    else if(G.roleVictory&&G.roleVictory.faction===winner&&G.roleVictory.type==='lly-hegemony'){title='开 源 成 势';sub=G.roleVictory.route==='treasury'?`${f.name} 以国力与中枢守势建立无节点科研网络`:`${f.name} 以算力节点、国库与中枢守势建立科研网络`;emblem='♜';}
+    else if(G.roleVictory&&G.roleVictory.faction===winner&&G.roleVictory.type==='jym-control'){title='运 筹 定 势';sub=`${f.name} 同时掌控多大战略区与 9013 中枢，以机动控图完成称霸`;emblem='✎';}
+    else{title='天 下 归 一';sub=`${f.name} 横扫三方，9014 尽归旗下`;emblem='♔';}
+    accent=f.color;
+  } else if(type==='lose'){
+    const f=FACTIONS[winner];title='大 势 已 去';
+    if(G.roleVictory&&G.roleVictory.faction===winner&&G.roleVictory.type==='rebel')sub='GYC 完成「收网时刻」终局，你未能在最后窗口击破其统帅';
+    else if(G.roleVictory&&G.roleVictory.faction===winner&&G.roleVictory.type==='lly-hegemony')sub=`${f.name} 以资源网络与中枢影响完成开源成势，你败了`;
+    else if(G.roleVictory&&G.roleVictory.faction===winner&&G.roleVictory.type==='jym-control')sub=`${f.name} 以跨区渗透完成暗网织局，你败了`;
+    else sub=`${f.name} 夺得天下，你败了`;
+    emblem='⚔';accent=f.color;
+  } else {
+    title='两 败 俱 伤';
+    sub='无人生还，ZY 实验室记录下了一切';
+    emblem='◆';accent='#9b59b6';
+  }
+  overBox.style.setProperty('--ac',accent);
+  overEmblem.textContent=emblem;
+  overTitle.textContent=title;
+  overTitle.style.setProperty('--ac',accent);
+  overSub.textContent=sub;
+
+  const player=G.player;
+  const st=G.stats;
+  const playerUnits=G.units.filter(u=>u.faction===player);
+  const aliveUnits=playerUnits.filter(u=>u.hp>0);
+  const maxLv=playerUnits.length?Math.max(...playerUnits.map(u=>u.level),1):1;
+  const totalDmg=st.damageDealt[player]||0;
+  const kills=st.kills[player]||0;
+  const lost=st.unitsLost[player]||0;
+  const towns=Object.values(G.towns).filter(f=>f===player).length;
+  const bossDmg=st.bossDamage[player]||0;
+  const clinicCount=G.clinical?CLINICAL_PARTNERS.filter(p=>G.clinical.unlocked[player]&&G.clinical.unlocked[player][p.key]).length:0;
+  const duelWins=G.duel&&G.duel.wins?(G.duel.wins[player]||0):0;
+  const duelFights=G.duel&&G.duel.fights?(G.duel.fights[player]||0):0;
+  const scen = '迷雾战局';
+
+  overStats.innerHTML=`
+    <div class="os-item"><div class="os-label">场 景</div><div class="os-val" style="font-size:14px">${scen}</div></div>
+    <div class="os-item"><div class="os-label">回 合</div><div class="os-val">${G.round}</div></div>
+    <div class="os-item"><div class="os-label">总 伤 害</div><div class="os-val">${totalDmg}</div></div>
+    <div class="os-item"><div class="os-label">击 杀</div><div class="os-val">${kills}</div></div>
+    <div class="os-item"><div class="os-label">损 失</div><div class="os-val">${lost}</div></div>
+    <div class="os-item"><div class="os-label">存 活</div><div class="os-val">${aliveUnits.length}<small>/${playerUnits.length}</small></div></div>
+    <div class="os-item"><div class="os-label">最 高 等 级</div><div class="os-val">Lv${maxLv}</div></div>
+    <div class="os-item"><div class="os-label">接 管 节 点</div><div class="os-val">${towns}</div></div>
+    <div class="os-item"><div class="os-label">卧 底 暴 露</div><div class="os-val">${G.stats.spyRevealed||0}</div></div>
+    <div class="os-item"><div class="os-label">临 床 伙 伴</div><div class="os-val">${clinicCount}<small>/${CLINICAL_PARTNERS.length}</small></div></div>
+    <div class="os-item"><div class="os-label">单 挑 战 绩</div><div class="os-val">${duelWins}<small>/${duelFights}</small></div></div>
+    ${G.bossTriggered?`<div class="os-item wide"><div class="os-label">BOSS 战 绩</div><div class="os-val">${G.bossDefeated?'已 击 败':'未 击 败'}${G.bossKey?' · '+BOSSES[G.bossKey].name:''}</div></div>`:''}
+  `;
+
+  let extra='';
+  if(playerUnits.length){
+    extra+=`<div class="over-sec-title">你 的 军 团</div><div class="over-units">`;
+    playerUnits.forEach(u=>{
+      const alive=u.hp>0;
+      const f=FACTIONS[u.faction];
+      const spyCls=u.spyRevealed?'spy':'';
+      extra+=`<div class="ou-chip ${alive?'':'dead'} ${spyCls}">
+        <span class="ou-dot" style="background:${f?f.color:'#888'};box-shadow:0 0 8px ${f?f.color:'#888'}"></span>
+        <span>${u.typeName}${u.spyRevealed?' 👁':''}</span>
+        <span class="ou-lv">Lv${u.level}</span>
+      </div>`;
+    });
+    extra+=`</div>`;
+  }
+  overExtra.innerHTML=extra;
+
+  setTimeout(()=>overEl.classList.add('show'),600);
+}
+
+
+/* ==================== 第十八版：本地存档 / 开始菜单 / 新手教程 ==================== */
+const SAVE_KEY='9014-tactics-save-v18';
+const SAVE_VERSION=18;
+const TUTORIAL_KEY='9014-tactics-tutorial-seen-v18';
+let autosaveTimer=null;
+let tutorialIndex=0;
+let tutorialFromGame=false;
+
+const TUTORIAL_STEPS=[
+  {title:'先看胜利目标',body:'四种身份并不只是颜色不同。<b>GYC重在破局收网，LLY重在资源网络，JYM重在跨区渗透，MXY重在合纵与制衡。</b>先看左侧「势力」页里的进度，再决定这一回合要做什么。',demo:'战棋不是“见人就打”。只要你的特殊胜利路线正在推进，有时绕路、守点、示弱或等待比击杀更重要。'},
+  {title:'选中、移动、攻击',body:'点击己方棋子后，地图会显示可移动与可攻击格。<b>先移动，再决定攻击或技能</b>；不同地形会改变移动消耗、防御、闪避与射程。',demo:'把鼠标停在任意地块上，会显示该格当前的完整效果。传送后移动范围会从新位置重新计算。'},
+  {title:'回合与行动',body:'每名单位通常拥有自己的移动与行动机会。完成部署后点击左侧的<b>「结束回合」</b>，其他势力会依次行动。进入你的下一回合时，资源、能量、部分回复和状态才会结算。',demo:'如果不知道下一步做什么：先确保核心单位安全，再推进你的胜利目标，最后才考虑追击残兵。'},
+  {title:'隐藏战局不要提前背',body:'BOSS、天灾、收圈、卧底和随机事件并非每局都会以相同方式出现。<b>它们发生时再读提示即可。</b>开始界面不会提前告诉你本局隐藏规则。',demo:'BOSS被击败后战局不会直接结束；三方会获得讨伐奖励，然后重新回到原本的竞争。'},
+  {title:'ZY是中立棋手',body:'地图边缘的<b>ZY · 量子隐士</b>不是可占领据点。你的行为会改变他的信任；关系足够时，可从「势力」页请求有限技术支援。中央紫色区域则是<b>9013中枢算力池</b>。',demo:'不要把“取得ZY支援”理解成占领他。ZY会观察局势，并可能拒绝已经过度强势的一方。'},
+  {title:'存档与继续',body:'游戏会在<b>你的可操作回合</b>自动保存，也可以点击顶部「保存」。退出网页、返回主菜单后，只要浏览器没有清除该页面的本地数据，就可以从开始界面的<b>「继续游戏」</b>恢复。',demo:'公开试玩建议：先完整玩1局，再根据实际体验阅读详细说明书。你不需要在第一局记住所有规则。'}
+];
+
+function showSaveToast(text='进度已保存'){
+  if(!saveToast)return;saveToast.textContent=text;saveToast.classList.remove('on');void saveToast.offsetWidth;saveToast.classList.add('on');setTimeout(()=>saveToast.classList.remove('on'),1400);
+}
+function safeCloneState(){
+  const copy=JSON.parse(JSON.stringify(G));
+  copy.selected=null;copy.moveCells=[];copy.atkCells=[];copy.skillCells=[];copy.skillMode=false;copy.busy=false;
+  return copy;
+}
+function saveGame(showToast=false){
+  if(G.over||!G.units.length||!startEl.classList.contains('hide'))return false;
+  try{
+    const payload={version:SAVE_VERSION,savedAt:Date.now(),map:MAP,state:safeCloneState(),logHtml:logEl.innerHTML,edictHtml:edictEl.innerHTML};
+    localStorage.setItem(SAVE_KEY,JSON.stringify(payload));
+    refreshContinueButton();
+    if(showToast)showSaveToast();
+    return true;
+  }catch(e){if(showToast)showSaveToast('保存失败：浏览器未允许本地存储');return false;}
+}
+function scheduleAutosave(){
+  if(autosaveTimer)clearTimeout(autosaveTimer);
+  if(G.over||G.busy||G.current!==G.player||!G.units.length||!startEl.classList.contains('hide'))return;
+  autosaveTimer=setTimeout(()=>saveGame(false),280);
+}
+function readSave(){
+  try{const raw=localStorage.getItem(SAVE_KEY);if(!raw)return null;const x=JSON.par
