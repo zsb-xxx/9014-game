@@ -12,13 +12,141 @@
 <div id="boot" style="min-height:100vh;background:#06060a;color:#d4af37;display:flex;align-items:center;justify-content:center;font-family:sans-serif;letter-spacing:.16em">9014 · 战棋载入中…</div>
 <script>
 (async()=>{
-  const load=async files=>(await Promise.all(files.map(f=>fetch(f).then(r=>{if(!r.ok)throw new Error(f+' '+r.status);return r.text()})))).join('');
+  const showFatal=(msg)=>{
+    document.body.innerHTML=`<div style="min-height:100vh;background:#06060a;color:#eee;display:flex;align-items:center;justify-content:center;padding:28px;font-family:sans-serif"><div style="max-width:720px"><h2 style="color:#d4af37">9014 · 战棋载入失败</h2><p style="line-height:1.8">${String(msg).replace(/[<>]/g,'')}</p><p style="color:#999;line-height:1.7">请尝试强制刷新（Ctrl+F5），若仍失败请将此提示截图反馈到 GitHub Issue。</p></div></div>`;
+  };
+  const fetchText=async f=>{
+    const r=await fetch(f+'?v=0901',{cache:'no-store'});
+    if(!r.ok)throw new Error(`${f} 加载失败（HTTP ${r.status}）`);
+    return r.text();
+  };
   try{
-    const [css,body,js]=await Promise.all([load(["css-01.txt", "css-02.txt", "css-03.txt", "css-04.txt", "css-05.txt", "css-06.txt"]),load(["body-01.txt", "body-02.txt"]),load(["js-01.txt", "js-02.txt", "js-03.txt", "js-04.txt", "js-05.txt", "js-06.txt", "js-07.txt", "js-08.txt", "js-09.txt", "js-10.txt"])]);
-    const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+    const cssFiles=["css-01.txt","css-02.txt","css-03.txt","css-04.txt","css-05.txt","css-06.txt"];
+    const bodyFiles=["body-01.txt","body-02.txt"];
+    const jsFiles=["js-01.txt","js-02.txt","js-03.txt","js-04.txt","js-05.txt","js-06.txt","js-07.txt","js-08.txt","js-09.txt","js-10.txt"];
+    const [cssParts,bodyParts,jsParts]=await Promise.all([
+      Promise.all(cssFiles.map(fetchText)),
+      Promise.all(bodyFiles.map(fetchText)),
+      Promise.all(jsFiles.map(fetchText))
+    ]);
+
+    const css=cssParts.join('');
+    const body=bodyParts.join('');
+
+    /*
+      公开版曾经把单文件源码拆在函数中间；其中两个历史分片上传时被错误补成了旧版完整函数，
+      与下一分片的“半个函数”重复，导致整个 JS 语法失败、页面可见但按钮无响应。
+      这里在加载时明确重建这两个跨分片函数，避免再次依赖脆弱的字节级拼接。
+    */
+    const currentMxyTarget=`function mxyTarget(m,ev){
+  const cells=[];
+  if(ev&&ev.key==='meet'){const reps=MAJOR_FACTIONS.filter(f=>!G.mxy.met[f]).map(f=>mxyRepresentative(f)).filter(Boolean);if(reps.length){const t=reps.sort((a,b)=>dist(m,a)-dist(m,b))[0];return [t.x,t.y];}}
+  if(ev&&ev.key==='observe'){
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+      if(!isPassableTile(x,y)||unitAt(x,y))continue;
+      const fs=MAJOR_FACTIONS.filter(f=>G.units.some(u=>u.hp>0&&u.faction===f&&['lord','brave','sage','guard'].includes(u.type)&&Math.max(Math.abs(u.x-x),Math.abs(u.y-y))<=2));
+      if(fs.length>=2)cells.push([x,y]);
+    }
+    if(cells.length)return cells.sort((a,b)=>(Math.abs(a[0]-m.x)+Math.abs(a[1]-m.y))-(Math.abs(b[0]-m.x)+Math.abs(b[1]-m.y)))[0];
+  }
+  if(ev&&ev.key==='balance'){const target=mxyStrongestFaction(),rep=target?mxyRepresentative(target):null;if(rep)return [rep.x,rep.y];}
+  if(ev&&ev.key==='verdict'){const st=mxyVerdictStatus(m);if(st.rep)return [st.rep.x,st.rep.y];}
+  const cx=G.shrink.active?(G.shrink.colMin+G.shrink.colMax)/2:(COLS-1)/2,cy=G.shrink.active?(G.shrink.rowMin+G.shrink.rowMax)/2:(ROWS-1)/2;return [Math.round(cx),Math.round(cy)];
+}\n`;
+
+    const currentSpawnBoss=`function spawnBoss(){
+  if(G.bossActive||G.bossDefeated)return;
+  G.bossActive=true;
+  G.bossTriggered=true;
+  const keys=Object.keys(BOSSES);
+  const key=keys[Math.floor(Math.random()*keys.length)];
+  G.bossKey=key;
+  const b=BOSSES[key];
+
+  const bossZY=zyCells();
+  clearSelection();
+  const evicted=evictBossZone(bossZY);
+  if(evicted)log(\`⚠ BOSS 降临区域已清场，\${evicted} 名单位被强制转移至外围空位。\`,'boss');
+
+  const lateRounds=Math.max(0,G.round-(G.scenario?.bossStartRound||5));
+  const hpMul=1+BOSS_RULES.hpGrowthPerRound*lateRounds;
+  const atkMul=1+BOSS_RULES.atkGrowthPerRound*lateRounds;
+  const scaledHp=Math.round(b.hp*hpMul);
+  const scaledAtk=Math.round(b.atk*atkMul);
+  const boss={
+    id:'boss_'+key,faction:key,type:'boss',
+    short:b.icon,typeName:b.title,
+    x:bossZY[0][0],y:bossZY[0][1],
+    hp:scaledHp,maxHp:scaledHp,atk:scaledAtk,mov:b.mov,
+    moved:false,acted:false,buff:1,movBonus:0,shield:0,
+    energy:0,level:1,exp:0,skillCd:0,
+    rageBuff:false,flagBuff:false,shieldWall:false,zyBuff:false,
+    invisibleChance:0.5,
+    isBoss:true,phase:1,spawnRound:G.round,lateRounds
+  };
+  G.units.push(boss);
+
+  boardEl.classList.add('boss-zone');
+  boardEl.classList.add('shake-d');
+  setTimeout(()=>boardEl.classList.remove('shake-d'),650);
+
+  announceBoss(b);
+  log(\`【\${b.name} 降临】<b style="color:\${b.color}">\${b.icon} \${b.title} · \${b.name}</b> 撕裂空间而至！\`,'boss');
+  log(\`BOSS 实际战力：<b>\${scaledHp} HP / \${scaledAtk} ATK</b>\${lateRounds?\`（晚降临 \${lateRounds} 回合，已动态强化）\`:''} · 战斗伤害减免 20%\`,'boss');
+  log(\`<b style="color:#ffd166">⚠ 胜利目标变更：击败 \${b.name}！三方停火，联手抗灾！</b>\`,'ally');
+
+  setTimeout(()=>{
+    Object.keys(G.spies).forEach(uid=>{
+      if(Math.random()<0.4) revealSpy(uid);
+    });
+  },1200);
+
+  renderUnits();
+  renderHUD();
+  refreshTiles();
+}\n`;
+
+    let j3=jsParts[2];
+    const mxyCut=j3.indexOf('function mxyTarget(m,ev){');
+    if(mxyCut<0)throw new Error('js-03.txt 缺少 mxyTarget 边界');
+    j3=j3.slice(0,mxyCut);
+
+    let j4=jsParts[3];
+    const mxyResume=j4.indexOf('function mxyTurn(onDone){');
+    if(mxyResume<0)throw new Error('js-04.txt 缺少 mxyTurn 边界');
+    j4=j4.slice(mxyResume);
+
+    let j7=jsParts[6];
+    const bossCut=j7.indexOf('function spawnBoss(){');
+    if(bossCut<0)throw new Error('js-07.txt 缺少 spawnBoss 边界');
+    j7=j7.slice(0,bossCut);
+
+    let j8=jsParts[7];
+    const bossResume=j8.indexOf('function announceBoss(b){');
+    if(bossResume<0)throw new Error('js-08.txt 缺少 announceBoss 边界');
+    j8=j8.slice(bossResume);
+
+    const js=[jsParts[0],jsParts[1],j3,currentMxyTarget,j4,jsParts[4],jsParts[5],j7,currentSpawnBoss,j8,jsParts[8],jsParts[9]].join('');
+
+    /* 先做一次完整语法解析；若拼接失败，直接给玩家可见错误而不是“页面能看但按钮失灵”。 */
+    new Function(js);
+
+    const st=document.createElement('style');
+    st.textContent=css;
+    document.head.appendChild(st);
     document.body.innerHTML=body;
-    const sc=document.createElement('script');sc.textContent=js;document.body.appendChild(sc);
-  }catch(e){document.getElementById('boot').textContent='载入失败：'+e.message;console.error(e)}
+
+    window.addEventListener('error',e=>{
+      console.error('9014 runtime error:',e.error||e.message);
+    });
+
+    const sc=document.createElement('script');
+    sc.textContent=js;
+    document.body.appendChild(sc);
+  }catch(e){
+    console.error(e);
+    showFatal(e&&e.message?e.message:e);
+  }
 })();
 </script>
 </body>
